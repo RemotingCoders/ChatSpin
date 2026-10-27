@@ -3,3 +3,5 @@
 @media(prefers-reduced-motion:reduce){*{transition:none!important}.wheel-wrap svg{filter:none}}
 
 .wheel-legend{list-style:none;padding:0;margin:4px 4px 22px;max-height:180px;overflow:auto;display:grid;gap:8px;text-align:left}.wheel-legend li{display:flex;align-items:flex-start;gap:9px;color:#d6cde1;font-size:11px;line-height:1.6;overflow-wrap:anywhere}.wheel-legend-number{display:inline-flex;align-items:center;justify-content:center;flex:0 0 25px;height:23px;border-left:3px solid;border-radius:3px;background:#25202d;color:#e9dff5;font-size:10px;font-weight:650;font-variant-numeric:tabular-nums}.wheel-legend .wheel-legend-winner{color:#f2e5ff}.wheel-legend-winner .wheel-legend-number{background:#49315d}.overlay .wheel-legend{max-width:560px;max-height:145px;margin:0 auto 24px}.overlay .wheel-legend li{font-size:13px}
+
+html.obs-page,html.obs-page body,html.obs-page #root,html.obs-page .overlay{background:transparent}
