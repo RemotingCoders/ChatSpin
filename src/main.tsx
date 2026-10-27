@@ -1,37 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import type { Group, Spin, State, User } from '../server/domain';
+import type { Group, State, User } from '../server/domain';
 import './style.css';
+import { Wheel } from './Wheel';
 type ViewGroup = Group & { count: number };
 type ViewState = Omit<State, 'groups'> & { groups: ViewGroup[]; obsUrl?: string; serverTime: number };
 type Session = { user: User | null; controller: boolean; demo: boolean; demoEnabled: boolean; configured: boolean; connection: string; ai: string };
 async function request(path: string, body?: unknown) {
   const response = await fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : undefined);
   const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Something went wrong. Please try again.'); return data;
-}
-const colors = ['#8b5cf6','#55d6b2','#6141a3','#b9a0f7','#2d847d','#b665c9','#4b436c','#79a99d'];
-function Wheel({ spin, entries, clock }: { spin: Spin | null; entries: { id: string; label: string; weight: number }[]; clock: number }) {
-  const [rotation, setRotation] = useState(0);
-  const candidates = spin?.candidates || entries;
-  const total = candidates.reduce((sum, c) => sum + c.weight, 0) || 1;
-  let cursor = 0; const slices = candidates.map(c => { const start = cursor; cursor += c.weight / total * 360; return { ...c, start, end: cursor }; });
-  const winner = slices.find(c => c.id === spin?.winner);
-  const finalRotation = winner ? 1800 + 360 - (winner.start + winner.end) / 2 : 0;
-  useEffect(() => {
-    let frame: number;
-    const tick = () => {
-      const duration = spin ? spin.end - spin.start : 0;
-      const progress = spin ? window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : duration ? Math.min(1, Math.max(0, (Date.now() + clock - spin.start) / duration)) : 1 : 0;
-      setRotation(finalRotation * (1 - Math.pow(1 - progress, 4)));
-      if (progress < 1 && spin) frame = requestAnimationFrame(tick);
-    }; tick(); return () => cancelAnimationFrame(frame);
-  }, [spin?.id, clock, finalRotation]);
-  const point = (angle: number, radius: number) => [200 + Math.sin(angle * Math.PI / 180) * radius, 200 - Math.cos(angle * Math.PI / 180) * radius];
-  return <div className="wheel-wrap"><div className="pointer"/><svg viewBox="0 0 400 400" role="img" aria-label="Selection wheel. Exact chances are listed below."><defs><filter id="glow"><feGaussianBlur stdDeviation="3"/></filter></defs><circle cx="200" cy="200" r="194" fill="none" stroke="#40374f" strokeWidth="1"/><g transform={`rotate(${rotation} 200 200)`}>{slices.length ? slices.map((slice, i) => {
-    const [x1,y1] = point(slice.start,184), [x2,y2] = point(slice.end,184); const mid = (slice.start + slice.end) / 2;
-    const [tx,ty] = point(mid,125); const large = slice.end - slice.start > 180 ? 1 : 0;
-    return <g key={slice.id}>{slices.length === 1 ? <circle cx="200" cy="200" r="184" fill={colors[0]}/> : <path d={`M200 200 L${x1} ${y1} A184 184 0 ${large} 1 ${x2} ${y2} Z`} fill={colors[i % colors.length]} stroke="#17131e" strokeWidth="2"/>}{slices.length <= 18 && slice.end - slice.start > 12 && <text x={tx} y={ty} textAnchor="middle" dominantBaseline="middle" transform={`rotate(${mid + 90} ${tx} ${ty})`} fill="#fff" fontSize="11" fontWeight="650">{slices.length > 8 ? i + 1 : slice.label.slice(0,19)}</text>}</g>;
-  }) : <circle cx="200" cy="200" r="184" fill="#282333"/>}</g><circle cx="200" cy="200" r="43" fill="#15121c" stroke="#c1a3ff" strokeWidth="3"/><text x="200" y="208" textAnchor="middle" fill="#dacbfa" fontSize="27">✦</text></svg><span className="wheel-dot d1"/><span className="wheel-dot d2"/></div>;
 }
 function App() {
   const [session, setSession] = useState<Session | null>(null), [state, setState] = useState<ViewState | null>(null);
