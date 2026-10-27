@@ -1,16 +1,16 @@
 import { randomInt, randomUUID } from 'node:crypto';
-export type User = { id: string; name: string };
-export type Question = { id: string; user: User; text: string; at: number };
+export type User = { id: string; name: string; login?: string };
+export type Question = { id: string; user: User; text: string; at: number; messageId?: string };
 export type Group = { id: string; title: string; text: string; questions: Question[]; supporters: string[]; status: 'pending' | 'live' | 'written'; answer: string; review?: string };
 export type Spin = { id: string; mode: 'questions' | 'participants'; candidates: { id: string; label: string; weight: number }[]; winner: string; label: string; text: string; start: number; end: number };
-export type State = { groups: Group[]; participants: (User & { selected: boolean })[]; registration: boolean; excludeSelected: boolean; mode: 'questions' | 'participants'; odds: 'equal' | 'support' | 'manual'; spin: Spin | null; usage: { calls: number; input: number; output: number }; demo: boolean };
+export type State = { groups: Group[]; participants: (User & { selected: boolean })[]; registration: boolean; excludeSelected: boolean; mode: 'questions' | 'participants'; odds: 'equal' | 'support' | 'manual'; spin: Spin | null; usage: { calls: number; input: number; output: number }; demo: boolean; replyHistory?: Record<string, number> };
 export const emptyState = (demo = false): State => ({ groups: [], participants: [], registration: true, excludeSelected: true, mode: 'questions', odds: 'equal', spin: null, usage: { calls: 0, input: 0, output: 0 }, demo });
 export const normalize = (text: string) => text.normalize('NFKC').trim().toLocaleLowerCase().replace(/\s+/g, ' ');
 export const support = (g: Group) => new Set([...g.questions.map(q => q.user.id), ...g.supporters]).size;
-export function addQuestion(s: State, user: User, text: string) {
+export function addQuestion(s: State, user: User, text: string, messageId?: string) {
   const exact = s.groups.find(g => g.questions.some(q => normalize(q.text) === normalize(text)));
   if (exact?.questions.some(q => q.user.id === user.id && normalize(q.text) === normalize(text))) return exact;
-  const q: Question = { id: randomUUID(), user, text, at: Date.now() };
+  const q: Question = { id: randomUUID(), user, text, at: Date.now(), ...(messageId ? { messageId } : {}) };
   if (exact) { exact.questions.push(q); return exact; }
   const group: Group = { id: randomUUID(), title: text.slice(0, 48), text, questions: [q], supporters: [], status: 'pending', answer: '' };
   s.groups.push(group); return group;

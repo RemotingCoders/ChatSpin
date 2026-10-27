@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
 import type { User } from './domain.ts';
-export type Credentials = { access_token: string; refresh_token: string; expires_in: number };
+export type Credentials = { access_token: string; refresh_token: string; expires_in: number; scope?: string[] };
 export class TwitchConnection {
   status = 'Disconnected';
   private socket?: WebSocket;
@@ -9,14 +9,26 @@ export class TwitchConnection {
   private validation?: ReturnType<typeof setInterval>;
   private seen = new Set<string>();
   private expires = 0;
-  constructor(private credentials: Credentials, private broadcaster: string, private onMessage: (user: User, text: string) => void, private endpoint = 'wss://eventsub.wss.twitch.tv/ws') {
+  constructor(private credentials: Credentials, private broadcaster: string, private onMessage: (user: User, text: string, messageId?: string) => void, private endpoint = 'wss://eventsub.wss.twitch.tv/ws') {
     this.expires = Date.now() + credentials.expires_in * 1000;
+  }
+  get canWriteChat() { return this.credentials.scope?.includes('user:write:chat') === true; }
+  async sendChatMessage(message: string, parentId: string) {
+    if (!this.canWriteChat || this.status !== 'Connected') throw new Error('Reconnect Twitch with chat write permission.');
+    const response = await fetch('https://api.twitch.tv/helix/chat/messages', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${await this.token()}`, 'Client-Id': process.env.TWITCH_CLIENT_ID!, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ broadcaster_id: this.broadcaster, sender_id: this.broadcaster, message, reply_parent_message_id: parentId }),
+    });
+    if (!response.ok) throw new Error('Twitch rejected the chat reply.');
+    const result = await response.json() as { data?: { is_sent: boolean }[] };
+    if (!result.data?.[0]?.is_sent) throw new Error('Twitch did not send the chat reply.');
   }
   async token() {
     if (Date.now() > this.expires - 60000) {
       const response = await fetch('https://id.twitch.tv/oauth2/token', { method: 'POST', body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: this.credentials.refresh_token, client_id: process.env.TWITCH_CLIENT_ID!, client_secret: process.env.TWITCH_CLIENT_SECRET! }) });
       if (!response.ok) throw new Error('Twitch authorization expired. Connect again.');
-      this.credentials = await response.json() as Credentials; this.expires = Date.now() + this.credentials.expires_in * 1000;
+      this.credentials = { ...this.credentials, ...await response.json() as Credentials }; this.expires = Date.now() + this.credentials.expires_in * 1000;
     }
     return this.credentials.access_token;
   }
@@ -45,7 +57,8 @@ export class TwitchConnection {
         if (data.metadata.message_type === 'notification' && !this.seen.has(data.metadata.message_id)) {
           this.seen.add(data.metadata.message_id); if (this.seen.size > 5000) this.seen.delete(this.seen.values().next().value!);
           const event = data.payload.event;
-          this.onMessage({ id: event.chatter_user_id, name: event.chatter_user_name }, event.message.text);
+          if (event.reply && event.chatter_user_id === this.broadcaster) return;
+          this.onMessage({ id: event.chatter_user_id, name: event.chatter_user_name, ...(event.chatter_user_login ? { login: event.chatter_user_login } : {}) }, event.message.text, event.message_id);
         }
       } catch (error) { this.status = error instanceof Error ? error.message : 'Twitch connection error'; }
     });

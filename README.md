@@ -50,12 +50,12 @@ OpenAI API usage requires your own API configuration and billing; a ChatGPT or C
 
 1. Register a confidential application at the Twitch developer console. Add the exact redirect `http://localhost:3000/auth/callback` (or the HTTPS origin plus `/auth/callback`). Set its client ID and secret on the server.
 2. Set `TWITCH_BROADCASTER_ID` to the channel owner's stable user ID. Restart ChatSpin.
-3. Choose **Connect Twitch** and authorize as that broadcaster. Only `user:read:chat` is requested for channel ingestion. The server uses Authorization Code flow, validates the returned token, and creates a `channel.chat.message` EventSub subscription on its WebSocket session.
+3. Choose **Connect Twitch** and authorize as that broadcaster. Authorize `user:read:chat` for ingestion and `user:write:chat` for public replies. Reconnect existing installations to grant the new permission. The server uses Authorization Code flow, validates the returned token, and creates a `channel.chat.message` EventSub subscription on its WebSocket session.
 4. Confirm the dashboard says **Connected**. From another Twitch account, send `What would you recommend to a first-time streamer?` in the channel chat.
-5. Verify the original question and author in the queue. Select **Spotlight**, then **Review & answer**, then **Mark answered live**. Verify it leaves the open queue. Reopen it from the Answered tab to restore eligibility.
+5. Verify the original question and author in the queue. Select **Spotlight**, then **Review & answer**, then **Mark answered** with the optional answer field empty. Verify it leaves the open queue. Reopen it from the Answered tab to restore eligibility.
 6. Send `!join` from two viewers. Switch to **Participant Wheel** and spin. Only distinct stable Twitch IDs enter. `!leave` withdraws an entry. Closing registration prevents new entries. Selected people are excluded by default; disable the checkbox to allow repeat turns.
 7. Sign into `/viewer` in a separate browser with another Twitch account. Viewer OAuth requests no chat or email scopes. Submit or support questions. Only that viewer's originals and answers associated with their questions are returned; controller actions receive HTTP 403.
-8. Write and approve an answer as the streamer. An exact duplicate receives that saved answer privately in the viewer space. Semantic matches to answered groups require explicit equivalence approval before answer reuse; doubtful matches remain separate for review. Nothing is sent to public chat or Whispers.
+8. Write and approve an answer as the streamer. When a viewer repeats that question in Twitch chat, an exact duplicate or strong semantic equivalent receives the approved text publicly, mentioning the asker and replying to their message. Doubtful matches require explicit equivalence approval. Live-only answers without saved text are never sent. Viewer space also shows associated approved answers; no Whispers are sent.
 9. Copy **OBS link** into an OBS Browser Source (suggested 1280×900). Keep its token private. It exposes only the spin snapshot and simulated-data flag, with no control endpoints. Spin again and verify identical result and animation. OBS tokens rotate on server restart; recopy the link.
 10. Temporarily interrupt connectivity. The dashboard reflects reconnecting; the server retries closed sockets and uses Twitch's reconnect URL for session migration. Tokens refresh before subscription as necessary and validate hourly. Revoked credentials require reconnection. Use **Disconnect** to stop ingestion.
 
@@ -65,7 +65,7 @@ Moderators are authorized using `MODERATOR_IDS`, not names or client-submitted r
 
 Exact matching uses Unicode normalization, case folding, and whitespace normalization; original text is unchanged. Authors and explicit supporters count once per user per group. Distinct questions on the same topic remain separate unless the model or a controller verifies equivalence. Single-user groups remain eligible.
 
-New real questions are processed in batches of up to five, with at most 30 candidate groups selected by lexical overlap. The model gets question IDs and representative text only, never credentials, author identities, or saved answers. Structured output and ID checks constrain decisions; messages are explicitly treated as untrusted data. Model failures preserve separate questions. Strong matches to pending groups merge; uncertain matches and all matches to answered groups require review. Splitting moves an original and its author support; explicit group-level support stays with the original group. The UI explains this policy. Reopening clears the saved answer to prevent stale answer reuse.
+New real questions are processed in batches of up to five, with at most 30 candidate groups selected by lexical overlap. The model gets question IDs and representative text only, never credentials, author identities, or saved answers. Structured output and ID checks constrain decisions; messages are explicitly treated as untrusted data. Model failures preserve separate questions. Strong matches to pending groups and written-answer groups merge; uncertain matches and matches to live-only answers require review. Splitting moves an original and its author support; explicit group-level support stays with the original group. The UI explains this policy. Reopening clears the saved answer to prevent stale answer reuse.
 
 The server chooses one result with Node's cryptographic `randomInt`, creates a persistent candidate/weight/result/time snapshot, and rejects another spin until it finishes. The animation derives its angle from that snapshot and server time; polling keeps the dashboard and OBS aligned. New arrivals and support during a spin affect future draws only. Equal chances use one ticket per group; support uses unique users; participants always have equal chances. Manual Spotlight is recorded as a direct selection. Answered groups are excluded until reopened. For many entries, sector labels become numbers or are hidden; the exact-chance list remains readable and sectors retain proportional area.
 
@@ -83,7 +83,7 @@ This is a single-channel, single-process prototype. JSON state has no multi-proc
 
 Messages are capped at 500 characters; written answers at 2,000. Web input is limited to 30 actions per user per minute. The AI queue holds at most 100 waiting groups and makes no parallel calls; overflow questions remain separate. Candidate retrieval is intentionally bounded and may miss multilingual matches, especially on large channels. There is no automatic semantic evaluation without credentials, and live Twitch permissions/reconnection still require verification with your account. An OBS link is a bearer capability: anyone possessing it can see the current presentation, but cannot control it. Anyone visiting Viewer space must authenticate, even to submit a question.
 
-No audio capture, transcription, generated answers, calls, payments, betting, Twitch Extension, or automatic public-chat responses are included.
+No audio capture, transcription, generated answers, calls, payments, betting, Twitch Extension, are included. Public chat replies reuse approved written answers only.
 
 ## Hackathon delivery
 
@@ -119,3 +119,11 @@ Detection uses local text rules, so it has no additional model-call cost. It is 
 ## OBS candidate synchronization
 
 OBS receives the current eligible entry list even before the first spin. The dashboard and presentation use the same server-side eligibility and weights. Both freeze the recorded candidates while a spin is active. Afterward, new questions, support changes, answered questions, registrations, and mode changes refresh the wheel for the next draw; the previous selected result remains in the spotlight. The OBS endpoint exposes entry titles and weights, not original messages, support identities, or written answers.
+
+## Completing an answer
+
+In **Review & answer**, the fixed bottom action bar has one **Mark answered** button. If the optional written answer contains text, the action saves it as approved and marks the question answered. If it is empty, the question is recorded as answered live without saved text. The dialog closes only after a successful save; errors leave the draft open. Originals and grouping corrections are collapsible so the main action remains visible on smaller windows.
+
+## Automatic approved-answer replies
+
+Replies are sent from the connected broadcaster account. The server sends at most one message part every two seconds, suppresses repeats to the same user and question for one minute, and retains that cooldown across restarts. Answers longer than Twitch’s message limit are split without rewriting. The queue holds at most 50 answers and expires jobs after five minutes; edited, reopened, or cleared answers invalidate queued replies. Failed or moderation-held messages are reported in the dashboard and are not automatically retried. No generated answer is posted. Tests use mocked Twitch endpoints; verify live delivery after reconnecting with write permission.

@@ -39,7 +39,7 @@ export function applyDecisions(s: State, incoming: Group[], candidates: Group[],
     const targetId = aliases.get(decision.target || '') || decision.target;
     const target = allowed ? s.groups.find(g => g.id === targetId) : undefined;
     if (!target) continue;
-    if (decision.confidence === 'equivalent') { merge(s, source.id, target.id); if (!s.groups.includes(source)) aliases.set(source.id, target.id); }
+    if (decision.confidence === 'equivalent') { merge(s, source.id, target.id, target.status === 'written' && Boolean(target.answer.trim())); if (!s.groups.includes(source)) aliases.set(source.id, target.id); }
     else if (decision.confidence === 'uncertain') source.review = target.id;
   }
 }

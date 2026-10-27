@@ -13,3 +13,19 @@ test('AI uncertain matches stay separate; invalid IDs and forward links cannot m
   assert.equal(s.groups.length,2); assert.equal(b.review,a.id);
   applyDecisions(s,[b],[a],[{source:b.id,target:'unknown',confidence:'equivalent',title:'Lighting'}]); assert.equal(s.groups.length,2);
 });
+
+test('Strong equivalent matches reuse approved written answers, while uncertain and live-only matches stay separate', () => {
+  for (const status of ['written','live'] as const) {
+    const state=emptyState();
+    const target=addQuestion(state,{id:'one',name:'One'},'Where do you live?'); target.status=status; target.answer=status==='written'?'I live in Argentina.':'';
+    const source=addQuestion(state,{id:'two',name:'Two'},'Where are you currently living?');
+    applyDecisions(state,[source],[target],[{source:source.id,target:target.id,confidence:'equivalent',title:'Current residence'}]);
+    assert.equal(state.groups.length,status==='written'?1:2);
+    if(status==='written') assert.equal(target.questions.length,2);
+    else assert.equal(source.review,target.id);
+  }
+  const state=emptyState(), target=addQuestion(state,{id:'one',name:'One'},'Where are you from?');target.status='written';target.answer='Argentina';
+  const source=addQuestion(state,{id:'two',name:'Two'},'Where do you live?');
+  applyDecisions(state,[source],[target],[{source:source.id,target:target.id,confidence:'uncertain',title:'Residence'}]);
+  assert.equal(state.groups.length,2);assert.equal(source.review,target.id);assert.equal(source.answer,'');
+});
