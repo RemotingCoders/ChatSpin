@@ -30,9 +30,15 @@ export function split(s: State, groupId: string, questionId: string) {
   const fresh: Group = { id: randomUUID(), title: q.text.slice(0, 48), text: q.text, questions: [q], supporters: [], status: 'pending', answer: '' };
   s.groups.push(fresh); return fresh;
 }
+export function eligibleEntries(s: State) {
+  return s.mode === 'questions'
+    ? s.groups.filter(g => g.status === 'pending').map(g => ({ id: g.id, label: g.title, weight: s.odds === 'support' ? support(g) : 1 }))
+    : s.participants.filter(p => !s.excludeSelected || !p.selected).map(p => ({ id: p.id, label: p.name, weight: 1 }));
+}
+
 export function spin(s: State, manualId?: string, now = Date.now()): Spin {
   if (s.spin && s.spin.end > now) throw new Error('A spin is already in progress.');
-  const candidates = s.mode === 'questions' ? s.groups.filter(g => g.status === 'pending').map(g => ({ id: g.id, label: g.title, weight: s.odds === 'support' ? support(g) : 1 })) : s.participants.filter(p => !s.excludeSelected || !p.selected).map(p => ({ id: p.id, label: p.name, weight: 1 }));
+  const candidates = eligibleEntries(s);
   if (!candidates.length) throw new Error('No eligible entries yet.');
   let winner;
   if (s.mode === 'questions' && (s.odds === 'manual' || manualId)) {

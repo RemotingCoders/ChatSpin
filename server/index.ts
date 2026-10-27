@@ -5,7 +5,7 @@ import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { existsSync, readFileSync, mkdirSync, writeFileSync, renameSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
-import { addQuestion, demoState, emptyState, merge, split, spin, support, type State, type User } from './domain.ts';
+import { addQuestion, demoState, emptyState, merge, split, spin, support, eligibleEntries, type State, type User } from './domain.ts';
 import { groupBatch } from './ai.ts';
 import { extractChatQuestion } from './chat.ts';
 import { archiveSession, clearCollection } from './reset.ts';
@@ -84,13 +84,13 @@ app.use('/api', (req, res, next) => {
 });
 app.get('/api/state', (req, res) => {
   const s = stateFor(req), controller = isController(req), id = req.session.user!.id;
-  res.json({ ...s, groups: s.groups.map(g => ({ ...g, supporters: undefined, count: support(g), questions: controller ? g.questions : g.questions.filter(q => q.user.id === id), review: controller ? g.review : undefined, answer: g.status === 'written' && (controller || g.questions.some(q => q.user.id === id)) ? g.answer : '' })), participants: controller ? s.participants : s.participants.filter(p => p.id === id), obsUrl: controller ? `${origin}/obs?token=${req.session.demo ? obsTokens.demo : obsTokens.real}` : undefined, serverTime: Date.now() });
+  res.json({ ...s, entries: controller ? eligibleEntries(s) : undefined, groups: s.groups.map(g => ({ ...g, supporters: undefined, count: support(g), questions: controller ? g.questions : g.questions.filter(q => q.user.id === id), review: controller ? g.review : undefined, answer: g.status === 'written' && (controller || g.questions.some(q => q.user.id === id)) ? g.answer : '' })), participants: controller ? s.participants : s.participants.filter(p => p.id === id), obsUrl: controller ? `${origin}/obs?token=${req.session.demo ? obsTokens.demo : obsTokens.real}` : undefined, serverTime: Date.now() });
 });
 app.get('/api/overlay', (req, res) => {
   const token = req.query.token;
   const s = token === obsTokens.demo ? demo : token === obsTokens.real ? real : undefined;
   if (!s) return res.status(403).json({ error: 'Open the OBS link from the streamer dashboard.' });
-  res.json({ spin: s.spin, demo: s.demo, mode: s.mode, serverTime: Date.now() });
+  res.json({ spin: s.spin, entries: eligibleEntries(s), demo: s.demo, mode: s.mode, serverTime: Date.now() });
 });
 const rates = new Map<string, number[]>();
 app.post('/api/action', (req, res) => {

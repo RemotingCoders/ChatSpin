@@ -23,10 +23,19 @@ test('HTTP authorization, privacy, origin protection, duplicate support, and OBS
     const signIn = async (role: string) => { const r=await call('/api/demo','',{role}); assert.equal(r.status,200); return r.headers.get('set-cookie')!.split(';')[0]; };
     const admin = await signIn('streamer'), alice = await signIn('viewer'), bob = await signIn('viewer');
     assert.equal((await (await call('/api/session',alice)).json()).controller,false);
+    const initialState=await (await call('/api/state',admin)).json();
+    const initialOverlayUrl=new URL(initialState.obsUrl);
+    const overlayPath=initialOverlayUrl.pathname.replace('/obs','/api/overlay')+initialOverlayUrl.search;
+    const initialOverlay=await (await call(overlayPath)).json();
+    assert.equal(initialOverlay.spin,null); assert.deepEqual(initialOverlay.entries,initialState.entries); assert.ok(initialOverlay.entries.length>0);
+    assert.equal(initialOverlay.groups,undefined); assert.equal(initialOverlay.participants,undefined);
+
     for (const type of ['spin','answer','merge','split','settings','registration','reopen','clear-questions','clear-participants']) assert.equal((await call('/api/action',alice,{type})).status,403);
     await call('/api/action',alice,{type:'ask',text:'My private original question'});
     let a=await (await call('/api/state',alice)).json();
     const own=a.groups.find((g: {text:string})=>g.text==='My private original question');
+    const updatedOverlay=await (await call(overlayPath)).json();
+    assert.equal(updatedOverlay.entries.length,initialOverlay.entries.length+1);
     assert.equal(own.questions.length,1); assert.equal(a.obsUrl,undefined);
     let b=await (await call('/api/state',bob)).json(); assert.equal(b.groups.find((g: {id:string})=>g.id===own.id).questions.length,0);
     await call('/api/action',alice,{type:'support',id:own.id}); await call('/api/action',alice,{type:'ask',text:'My private original question'});
@@ -53,6 +62,7 @@ test('HTTP authorization, privacy, origin protection, duplicate support, and OBS
     assert.equal((await call('/api/action',admin,{type:'clear-questions',confirmed:true})).status,200);
     let cleared=await (await call('/api/state',admin)).json();
     assert.equal(cleared.groups.length,0); assert.equal(cleared.participants.length,beforeClear.participants.length); assert.equal(cleared.spin,null);
+    assert.deepEqual((await (await call(overlayPath)).json()).entries,[]);
     const backupFiles=readdirSync(join(dir,'backups'));
     assert.equal(backupFiles.length,1);
     const backup=JSON.parse(readFileSync(join(dir,'backups',backupFiles[0]),'utf8'));
