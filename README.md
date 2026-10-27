@@ -101,3 +101,11 @@ Official sources checked October 24, 2026:
 ## License
 
 ChatSpin is licensed under the [MIT License](LICENSE). Third-party dependencies retain their respective licenses.
+
+## Start fresh
+
+The streamer dashboard has separate **Clear questions** and **Clear participants** buttons under **Start fresh**. Each opens a confirmation dialog. Only the broadcaster or explicitly authorized moderators may clear collections, and clearing is blocked during a spin.
+
+Clearing questions removes all groups, originals, support, saved answers, and any question draw from the current session; it preserves participants. Clearing participants removes registrations and any participant draw; it preserves questions and saved answers. Registration settings and usage totals stay unchanged. Clearing questions also empties the waiting AI queue; an active grouping batch must finish first. New incoming chat commands can create fresh entries afterward.
+
+Before either action, the server saves a full session snapshot in a `backups/` directory alongside `DATA_FILE`, including for demo sessions. A failed backup prevents clearing. Backups contain viewer data and must remain private; the default `data/` location is excluded from Git. To recover a snapshot, stop the server, preserve the current state file, copy the chosen backup over `DATA_FILE`, then restart and reconnect Twitch. No restore endpoint is exposed to viewers.

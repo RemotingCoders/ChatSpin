@@ -7,6 +7,7 @@ import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { addQuestion, demoState, emptyState, merge, split, spin, support, type State, type User } from './domain.ts';
 import { groupBatch } from './ai.ts';
+import { archiveSession, clearCollection } from './reset.ts';
 import { TwitchConnection, type Credentials } from './twitch.ts';
 declare module 'express-session' { interface SessionData { user: User; demo: boolean; demoController: boolean; oauth: { state: string; role: string; at: number } } }
 const app = express();
@@ -91,13 +92,13 @@ app.get('/api/overlay', (req, res) => {
 });
 const rates = new Map<string, number[]>();
 app.post('/api/action', (req, res) => {
-  const action = z.object({ type: z.string().max(30), id: z.string().max(100).optional(), target: z.string().max(100).optional(), text: z.string().max(2000).optional(), title: z.string().max(60).optional(), value: z.union([z.boolean(), z.string().max(30)]).optional() }).parse(req.body);
+  const action = z.object({ type: z.string().max(30), id: z.string().max(100).optional(), target: z.string().max(100).optional(), text: z.string().max(2000).optional(), title: z.string().max(60).optional(), value: z.union([z.boolean(), z.string().max(30)]).optional(), confirmed: z.boolean().optional() }).parse(req.body);
   const s = stateFor(req), user = req.session.user!;
   const publicActions = ['ask', 'support', 'join', 'leave'];
   if (!publicActions.includes(action.type) && !isController(req)) return res.status(403).json({ error: 'Streamer or authorized moderator access required.' });
   const recent = (rates.get(user.id) || []).filter(t => t > Date.now() - 60000); if (recent.length >= 30) return res.status(429).json({ error: 'Please wait before sending more actions.' }); recent.push(Date.now()); rates.set(user.id, recent);
   if (locked(s) && !publicActions.includes(action.type)) return res.status(409).json({ error: 'Wait for the current spin to finish.' });
-  if (grouping && !req.session.demo && ['merge', 'split', 'answer', 'live', 'reopen', 'spin', 'edit'].includes(action.type)) return res.status(409).json({ error: 'Grouping is in progress. Please try again shortly.' });
+  if (grouping && !req.session.demo && ['merge', 'split', 'answer', 'live', 'reopen', 'spin', 'edit', 'clear-questions'].includes(action.type)) return res.status(409).json({ error: 'Grouping is in progress. Please try again shortly.' });
   const group = s.groups.find(g => g.id === action.id);
   switch (action.type) {
     case 'ask': { const text = z.string().trim().min(3).max(500).parse(action.text); const g = addQuestion(s, user, text); if (!s.demo && g.questions.length === 1) enqueue(g.id); break; }
@@ -115,6 +116,14 @@ app.post('/api/action', (req, res) => {
     case 'merge': merge(s, action.id!, action.target!, true); break;
     case 'split': split(s, action.id!, action.target!); break;
     case 'dismiss': if (group) delete group.review; break;
+    case 'clear-questions':
+    case 'clear-participants': {
+      if (action.confirmed !== true) throw new Error('Confirm before clearing this collection.');
+      const target = action.type === 'clear-questions' ? 'questions' : 'participants';
+      clearCollection(s, target, () => { archiveSession(s, file); });
+      if (!s.demo && target === 'questions') { queued = []; scheduled.clear(); }
+      break;
+    }
     case 'disconnect': if (user.id !== process.env.TWITCH_BROADCASTER_ID && !s.demo) return res.sendStatus(403); if (!s.demo) twitch?.stop(); break;
     default: throw new Error('Unknown action.');
   }

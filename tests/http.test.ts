@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 test('HTTP authorization, privacy, origin protection, duplicate support, and OBS snapshot', async () => {
@@ -23,7 +23,7 @@ test('HTTP authorization, privacy, origin protection, duplicate support, and OBS
     const signIn = async (role: string) => { const r=await call('/api/demo','',{role}); assert.equal(r.status,200); return r.headers.get('set-cookie')!.split(';')[0]; };
     const admin = await signIn('streamer'), alice = await signIn('viewer'), bob = await signIn('viewer');
     assert.equal((await (await call('/api/session',alice)).json()).controller,false);
-    for (const type of ['spin','answer','merge','split','settings','registration','reopen']) assert.equal((await call('/api/action',alice,{type})).status,403);
+    for (const type of ['spin','answer','merge','split','settings','registration','reopen','clear-questions','clear-participants']) assert.equal((await call('/api/action',alice,{type})).status,403);
     await call('/api/action',alice,{type:'ask',text:'My private original question'});
     let a=await (await call('/api/state',alice)).json();
     const own=a.groups.find((g: {text:string})=>g.text==='My private original question');
@@ -45,6 +45,22 @@ test('HTTP authorization, privacy, origin protection, duplicate support, and OBS
     assert.deepEqual(overlay.spin,dashboard.spin); assert.equal(overlay.groups,undefined); assert.equal(dashboard.spin.winner,own.id);
     await call('/api/action',admin,{type:'spin'});
     assert.equal((await call('/api/action',admin,{type:'spin'})).status,409);
+    for (const type of ['clear-questions','clear-participants']) assert.equal((await call('/api/action',admin,{type,confirmed:true})).status,409);
+    await new Promise(resolve => setTimeout(resolve, 6100));
+    await call('/api/action',alice,{type:'join'});
+    const beforeClear=await (await call('/api/state',admin)).json();
+    assert.equal((await call('/api/action',admin,{type:'clear-questions'})).status,400);
+    assert.equal((await call('/api/action',admin,{type:'clear-questions',confirmed:true})).status,200);
+    let cleared=await (await call('/api/state',admin)).json();
+    assert.equal(cleared.groups.length,0); assert.equal(cleared.participants.length,beforeClear.participants.length); assert.equal(cleared.spin,null);
+    const backupFiles=readdirSync(join(dir,'backups'));
+    assert.equal(backupFiles.length,1);
+    const backup=JSON.parse(readFileSync(join(dir,'backups',backupFiles[0]),'utf8'));
+    assert.equal(backup.groups.length,beforeClear.groups.length); assert.equal(backup.participants.length,beforeClear.participants.length);
+    assert.equal((await call('/api/action',admin,{type:'clear-participants',confirmed:true})).status,200);
+    cleared=await (await call('/api/state',admin)).json();
+    assert.equal(cleared.participants.length,0); assert.equal(cleared.groups.length,0);
+    assert.equal(readdirSync(join(dir,'backups')).length,2);
     await call('/api/action',admin,{type:'registration',value:false});
   } finally { child.kill(); await new Promise(resolve=>child.once('exit',resolve)); rmSync(dir,{recursive:true,force:true}); }
 });
