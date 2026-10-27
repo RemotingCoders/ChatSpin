@@ -29,3 +29,26 @@ test('Strong equivalent matches reuse approved written answers, while uncertain 
   applyDecisions(state,[source],[target],[{source:source.id,target:target.id,confidence:'uncertain',title:'Residence'}]);
   assert.equal(state.groups.length,2);assert.equal(source.review,target.id);assert.equal(source.answer,'');
 });
+
+
+test('Contextual activity and goal questions merge only within one five-minute pending window', () => {
+  for (const [gap, status, expected] of [[60000, 'pending', 1], [1800000, 'pending', 2], [60000, 'written', 2]] as const) {
+    const state = emptyState();
+    const target = addQuestion(state, {id:'one',name:'One'}, 'What are you doing?');
+    const source = addQuestion(state, {id:'two',name:'Two'}, 'What are you trying to do?');
+    target.questions[0].at = 1000000; source.questions[0].at = 1000000 + gap;
+    target.status = status; if (status === 'written') target.answer = 'An earlier activity';
+    applyDecisions(state, [source], [target], [{source:source.id,target:target.id,confidence:'contextual',title:'Current project'}]);
+    assert.equal(state.groups.length, expected);
+  }
+});
+
+test('Contextual groups cannot extend the time window through chained arrivals', () => {
+  const state = emptyState();
+  const a = addQuestion(state, {id:'a',name:'A'}, 'What are you doing?');
+  const b = addQuestion(state, {id:'b',name:'B'}, 'What are you trying to do?');
+  const c = addQuestion(state, {id:'c',name:'C'}, 'What are you working on?');
+  a.questions[0].at = 1000000; b.questions[0].at = 1240000; c.questions[0].at = 1480000;
+  applyDecisions(state, [b,c], [a], [{source:b.id,target:a.id,confidence:'contextual',title:'Project'}, {source:c.id,target:b.id,confidence:'contextual',title:'Project'}]);
+  assert.equal(state.groups.length, 2); assert.equal(a.questions.length, 2);
+});
