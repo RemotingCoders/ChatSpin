@@ -7,6 +7,7 @@ import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
 import { addQuestion, demoState, emptyState, merge, split, spin, support, type State, type User } from './domain.ts';
 import { groupBatch } from './ai.ts';
+import { extractChatQuestion } from './chat.ts';
 import { archiveSession, clearCollection } from './reset.ts';
 import { TwitchConnection, type Credentials } from './twitch.ts';
 declare module 'express-session' { interface SessionData { user: User; demo: boolean; demoController: boolean; oauth: { state: string; role: string; at: number } } }
@@ -40,7 +41,8 @@ setInterval(async () => {
   try { await groupBatch(real, ids); aiStatus = 'Ready'; persist(); } catch { aiStatus = 'Grouping failed — questions preserved separately'; } finally { grouping = false; }
 }, 2500);
 function ingest(user: User, text: string) {
-  if (text.startsWith('!ask ')) { const body = text.slice(5).trim(); if (body && body.length <= 500) { const g = addQuestion(real, user, body); if (g.questions.length === 1) enqueue(g.id); persist(); } }
+  const question = extractChatQuestion(text);
+  if (question) { const g = addQuestion(real, user, question); if (g.questions.length === 1) enqueue(g.id); persist(); }
   if (text.trim() === '!join' && real.registration && !real.participants.some(p => p.id === user.id)) { real.participants.push({ ...user, selected: false }); persist(); }
   if (text.trim() === '!leave') { real.participants = real.participants.filter(p => p.id !== user.id); persist(); }
 }

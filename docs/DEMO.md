@@ -8,7 +8,7 @@ Before recording: configure the real Twitch connection, run the live AI evaluati
 “On a busy Twitch stream, good questions get buried. ChatSpin turns that busy chat into a conversation, while making room for questions from just one person.” Show the connected channel and dashboard together.
 
 **0:20–0:55 — From chat to a question**
-Two viewers post equivalent `!ask` questions. Show originals, unique support, and the representative question. Show a different question on the same topic staying separate. Explain that the AI organizes questions and never invents answers. If an AI match needs review, show the review instead of pretending it was automatic.
+Two viewers post equivalent ordinary questions in chat, without a command. Show originals, unique support, and the representative question. Show a different question on the same topic staying separate. Explain that the AI organizes questions and never invents answers. If an AI match needs review, show the review instead of pretending it was automatic.
 
 **0:55–1:25 — A fair turn**
 Choose Equal chances and spin. Show the dashboard and OBS selecting the same question. Show the exact-chance list and explain By support. Spotlight a single-support question to demonstrate that minority questions stay eligible. Mark it answered live.
