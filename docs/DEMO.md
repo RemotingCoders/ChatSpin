@@ -17,7 +17,7 @@ Choose Equal chances and spin. Show the dashboard and OBS selecting the same que
 Viewers enter with `!join`. Switch to Participant Wheel, close registration, and spin. Explain one entry per stable Twitch ID, optional repeat exclusion, and no automatic microphone access.
 
 **1:45–2:10 — Answers that stay useful**
-Save an approved written answer. Submit an exact equivalent from a viewer, then show that answer in that viewer's space. Explain that uncertain semantic matches require review and nothing is posted automatically to general chat.
+Save an approved written answer. Have a late-arriving viewer repeat the question in Twitch chat. Show the public approved-answer reply mentioning them. Explain that uncertain matches require review, the model never generates answers, and session-only answers expire when starting a new live session. Briefly show the pause control and reply history.
 
 **2:10–2:35 — Built with Codex**
 Cut to genuine development footage. “I built ChatSpin with Codex from an empty repository: the TypeScript server, React dashboard, Twitch EventSub integration, synchronized wheel, and tests for unique support, corrections, permissions, and selection.” Show a passing test run and a correction in the UI.

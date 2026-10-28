@@ -25,3 +25,23 @@ test('EventSub subscribes, deduplicates notifications, reconnects, and handles r
     current!.send(JSON.stringify({metadata:{message_type:'revocation'},payload:{}})); await until(()=>client.status.includes('revoked'));
   } finally { client.stop(); for(const socket of server.clients) socket.terminate(); server.close(); globalThis.fetch=originalFetch; }
 });
+
+test('Twitch migration uses independent socket watchdogs and does not resubscribe',async()=>{
+ const server=new WebSocketServer({port:0,host:'127.0.0.1'});await new Promise<void>(r=>server.once('listening',r));
+ const address=server.address();if(!address||typeof address==='string')throw Error('No address');
+ const endpoint=`ws://127.0.0.1:${address.port}`;let connections=0,subscriptions=0;const sockets:WebSocket[]=[];const fetchBefore=globalThis.fetch;
+ globalThis.fetch=(async()=>{subscriptions++;return new Response('{}',{status:202});}) as typeof fetch;
+ server.on('connection',socket=>{connections++;sockets.push(socket);socket.send(JSON.stringify({metadata:{message_type:'session_welcome'},payload:{session:{id:'session-'+connections,keepalive_timeout_seconds:1}}}));});
+ const client=new TwitchConnection({access_token:'test',refresh_token:'test',expires_in:3600},'owner',()=>{},endpoint);
+ const until=async(check:()=>boolean)=>{const end=Date.now()+3000;while(!check()){if(Date.now()>end)throw Error('Migration timeout');await new Promise(r=>setTimeout(r,10));}};
+ try{
+  await client.start();await until(()=>client.status==='Connected');sockets[0].send(JSON.stringify({metadata:{message_type:'session_reconnect'},payload:{session:{reconnect_url:endpoint}}}));
+  await until(()=>connections===2&&client.status==='Connected');assert.equal(subscriptions,1);await until(()=>sockets[0].readyState===3);assert.equal(sockets[1].readyState,1);
+ }finally{client.stop();globalThis.fetch=fetchBefore;for(const socket of server.clients)socket.terminate();await new Promise<void>(r=>server.close(()=>r()));}
+});
+
+test('Concurrent token requests share one refresh and persist the new credentials',async()=>{
+ const original=globalThis.fetch;let calls=0,saved=0;
+ globalThis.fetch=(async()=>{calls++;await new Promise(r=>setTimeout(r,20));return new Response(JSON.stringify({access_token:'renewed',refresh_token:'new-refresh',expires_in:3600}));}) as typeof fetch;
+ try{const client=new TwitchConnection({access_token:'expired',refresh_token:'test',expires_in:0},'owner',()=>{},undefined,()=>saved++);const tokens=await Promise.all([client.token(),client.token()]);assert.deepEqual(tokens,['renewed','renewed']);assert.equal(calls,1);assert.equal(saved,1);}finally{globalThis.fetch=original;}
+});

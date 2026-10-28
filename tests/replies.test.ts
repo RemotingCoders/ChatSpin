@@ -79,3 +79,8 @@ test('Twitch chat API uses broadcaster identity and recognizes dropped messages'
     readOnly.status = 'Connected'; await assert.rejects(readOnly.sendChatMessage('@viewer Approved answer', 'parent'), /write permission/);
   } finally { globalThis.fetch = originalFetch; }
 });
+
+test('A restart never retries a public send whose outcome is unknown',async()=>{
+ const {state,group}=fixture();let sent=0;const first=new ApprovedReplies(()=>state,async()=>{},()=>true,()=>{});first.enqueue(group,viewer,'uncertain');state.replyJobs![0].sending=true;
+ const restarted=new ApprovedReplies(()=>state,async()=>{sent++;},()=>true,()=>{});await restarted.flush();assert.equal(sent,0);assert.match(state.replyLog!.at(-1)!.status,/unknown/);
+});

@@ -30,7 +30,7 @@ test('HTTP authorization, privacy, origin protection, duplicate support, and OBS
     assert.equal(initialOverlay.spin,null); assert.deepEqual(initialOverlay.entries,initialState.entries); assert.ok(initialOverlay.entries.length>0);
     assert.equal(initialOverlay.groups,undefined); assert.equal(initialOverlay.participants,undefined);
 
-    for (const type of ['spin','answer','merge','split','settings','registration','reopen','clear-questions','clear-participants']) assert.equal((await call('/api/action',alice,{type})).status,403);
+    for (const type of ['spin','answer','merge','split','settings','registration','reopen','clear-questions','clear-participants','new-session','pause-replies','limits','reprocess','rotate-obs']) assert.equal((await call('/api/action',alice,{type})).status,403);
     await call('/api/action',alice,{type:'ask',text:'My private original question'});
     let a=await (await call('/api/state',alice)).json();
     const own=a.groups.find((g: {text:string})=>g.text==='My private original question');
@@ -46,6 +46,14 @@ test('HTTP authorization, privacy, origin protection, duplicate support, and OBS
     assert.equal(b.groups.find((g: {id:string})=>g.id===own.id).answer,'');
     await call('/api/action',bob,{type:'ask',text:'My private original question'});
     b=await (await call('/api/state',bob)).json(); assert.equal(b.groups.find((g: {id:string})=>g.id===own.id).answer,'Approved exact answer');
+    assert.equal((await call('/api/action',admin,{type:'new-session',confirmed:true})).status,200);
+    b=await (await call('/api/state',bob)).json();assert.equal(b.groups.find((g:{id:string})=>g.id===own.id).answer,'');
+    const archived=await (await call('/api/state',admin)).json();assert.equal(archived.groups.find((g:{id:string})=>g.id===own.id).answer,'Approved exact answer');
+    await call('/api/action',admin,{type:'answer',id:own.id,text:'Permanent answer',value:'permanent'});
+    await call('/api/action',admin,{type:'new-session',confirmed:true});
+    b=await (await call('/api/state',bob)).json();assert.equal(b.groups.find((g:{id:string})=>g.id===own.id).answer,'Permanent answer');
+    assert.equal((await call('/api/action',admin,{type:'pause-replies',value:true})).status,200);
+    assert.equal((await (await call('/api/state',admin)).json()).repliesPaused,true);
     await call('/api/action',admin,{type:'reopen',id:own.id});
     assert.equal((await call('/api/action',admin,{type:'spin',id:own.id})).status,200);
     const dashboard=await (await call('/api/state',admin)).json();
@@ -54,7 +62,7 @@ test('HTTP authorization, privacy, origin protection, duplicate support, and OBS
     assert.deepEqual(overlay.spin,dashboard.spin); assert.equal(overlay.groups,undefined); assert.equal(dashboard.spin.winner,own.id);
     await call('/api/action',admin,{type:'spin'});
     assert.equal((await call('/api/action',admin,{type:'spin'})).status,409);
-    for (const type of ['clear-questions','clear-participants']) assert.equal((await call('/api/action',admin,{type,confirmed:true})).status,409);
+    for (const type of ['clear-questions','clear-participants','new-session','pause-replies','limits','reprocess','rotate-obs']) assert.equal((await call('/api/action',admin,{type,confirmed:true})).status,409);
     await new Promise(resolve => setTimeout(resolve, 6100));
     await call('/api/action',alice,{type:'join'});
     const beforeClear=await (await call('/api/state',admin)).json();
@@ -72,5 +80,8 @@ test('HTTP authorization, privacy, origin protection, duplicate support, and OBS
     assert.equal(cleared.participants.length,0); assert.equal(cleared.groups.length,0);
     assert.equal(readdirSync(join(dir,'backups')).length,2);
     await call('/api/action',admin,{type:'registration',value:false});
+    assert.equal((await call('/api/action',admin,{type:'rotate-obs',confirmed:true})).status,200);
+    assert.equal((await call(overlayPath)).status,403);
+    const rotated=await (await call('/api/state',admin)).json();assert.notEqual(rotated.obsUrl,initialState.obsUrl);
   } finally { child.kill(); await new Promise(resolve=>child.once('exit',resolve)); rmSync(dir,{recursive:true,force:true}); }
 });

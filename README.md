@@ -6,11 +6,12 @@ Built from an empty directory with Codex during the Codex x TwitchCon Hackathon 
 
 ## Run locally
 
-Requirements: Node.js 22.12+ (tested with Node 24), npm, and a modern browser.
+Requirements: Node.js 24+ (built-in SQLite), npm, and a modern browser.
 
 ```sh
 npm install
-cp .env.example .env
+# Only on first setup, if .env does not already exist:
+cp -n .env.example .env
 npm run dev
 ```
 
@@ -40,9 +41,10 @@ Set variables in `.env`; never commit it.
 | `OPENAI_API_KEY` | Optional server-only API key for semantic grouping |
 | `OPENAI_MODEL` | Default `gpt-4.1-mini`; configurable based on account availability |
 | `ENABLE_DEMO` | Set `false` to disable local demo; always disabled in production |
-| `DATA_FILE` | Real channel JSON persistence, default `./data/state.json` |
+| `DATA_FILE` | Legacy import/backup path, default `./data/state.json`; live storage uses the adjacent `.sqlite` database |
+| `OPENAI_EMBEDDING_MODEL` | Semantic candidate index, default `text-embedding-3-small` |
 
-Changing `PORT` also requires changing `APP_URL`. Set `APP_URL` to the exact HTTPS public origin when using a reverse proxy. Configure only a trusted proxy; the application currently trusts one proxy hop.
+Changing `PORT` also requires changing `APP_URL`. Set `APP_URL` to the exact HTTPS public origin when using a reverse proxy. Set `TRUST_PROXY_HOPS=1` only when exactly one trusted reverse proxy terminates HTTPS; the default is `0` (no trusted proxy). Production requires a random signing/encryption secret of at least 32 characters.
 
 OpenAI API usage requires your own API configuration and billing; a ChatGPT or Codex subscription does not provide this application's API credentials. Usage displays request and input/output token totals. Estimate spend using your model's current API rates. Without a key, exact duplicate matching remains available; other questions stay separate.
 
@@ -56,7 +58,7 @@ OpenAI API usage requires your own API configuration and billing; a ChatGPT or C
 6. Send `!join` from two viewers. Switch to **Participant Wheel** and spin. Only distinct stable Twitch IDs enter. `!leave` withdraws an entry. Closing registration prevents new entries. Selected people are excluded by default; disable the checkbox to allow repeat turns.
 7. Sign into `/viewer` in a separate browser with another Twitch account. Viewer OAuth requests no chat or email scopes. Submit or support questions. Only that viewer's originals and answers associated with their questions are returned; controller actions receive HTTP 403.
 8. Write and approve an answer as the streamer. When a viewer repeats that question in Twitch chat, an exact duplicate or strong semantic equivalent receives the approved text publicly, mentioning the asker and replying to their message. Doubtful matches require explicit equivalence approval. Live-only answers without saved text are never sent. Viewer space also shows associated approved answers; no Whispers are sent.
-9. Copy **OBS link** into an OBS Browser Source (suggested 1280×900). Keep its token private. It exposes only the spin snapshot and simulated-data flag, with no control endpoints. Spin again and verify identical result and animation. OBS tokens rotate on server restart; recopy the link.
+9. Copy **OBS link** into an OBS Browser Source (suggested 1280×900). Keep its token private. It exposes the spin snapshot, eligible entry titles/weights, mode, and simulated-data flag, with no control endpoints. Spin again and verify identical result and animation. The OBS link persists across restarts. **Regenerate OBS link** explicitly invalidates the old one.
 10. Temporarily interrupt connectivity. The dashboard reflects reconnecting; the server retries closed sockets and uses Twitch's reconnect URL for session migration. Tokens refresh before subscription as necessary and validate hourly. Revoked credentials require reconnection. Use **Disconnect** to stop ingestion.
 
 Moderators are authorized using `MODERATOR_IDS`, not names or client-submitted roles. They sign in through Viewer space and open the dashboard after authentication. This version intentionally uses an explicit operator allowlist instead of requesting Twitch moderation scopes.
@@ -65,7 +67,7 @@ Moderators are authorized using `MODERATOR_IDS`, not names or client-submitted r
 
 Exact matching uses Unicode normalization, case folding, and whitespace normalization; original text is unchanged. Authors and explicit supporters count once per user per group. Distinct questions on the same topic remain separate unless the model or a controller verifies equivalence. Single-user groups remain eligible.
 
-New real questions are processed in batches of up to five, with at most 30 candidate groups selected by lexical overlap. The model gets question IDs, representative text, status, and first/last message times, never credentials, author identities, or saved answers. Current-activity and goal questions can share a contextual group when they seek the same explanation and all originals arrived within five minutes. This contextual rule applies only to open groups, never to saved-answer reuse; the full time span prevents chained arrivals extending the window. Structured output and ID checks constrain decisions; messages are explicitly treated as untrusted data. Model failures preserve separate questions. Strong matches to pending groups and written-answer groups merge; uncertain matches and matches to live-only answers require review. Splitting moves an original and its author support; explicit group-level support stays with the original group. The UI explains this policy. Reopening clears the saved answer to prevent stale answer reuse.
+New real questions are processed in batches of up to five, with at most 30 candidate groups. When more candidates exist, cached multilingual embeddings rank them by semantic similarity. The model gets question IDs, representative text, status, and first/last message times, never credentials, author identities, or saved answers. Current-activity and goal questions can share a contextual group when they seek the same explanation and all originals arrived within five minutes. Every automatic merge between open groups, including exact wording, must fit a five-minute combined time span. Current-activity questions retain this time restriction after answering; independently equivalent saved answers follow their session/permanent scope. Manual equivalence approval can override automatic grouping. Structured output and ID checks constrain decisions; messages are explicitly treated as untrusted data. Model failures preserve separate questions. Strong matches to pending groups and written-answer groups merge; uncertain matches and matches to live-only answers require review. Splitting moves an original and its author support; explicit group-level support stays with the original group. The UI explains this policy. Reopening clears the active answer and preserves it in answer history. Merging preserves existing answers; conflicting answers require choosing a winner. Previous versions remain available in the review dialog.
 
 The server chooses one result with Node's cryptographic `randomInt`, creates a persistent candidate/weight/result/time snapshot, and rejects another spin until it finishes. The animation derives its angle from that snapshot and server time; polling keeps the dashboard and OBS aligned. New arrivals and support during a spin affect future draws only. Equal chances use one ticket per group; support uses unique users; participants always have equal chances. Manual Spotlight is recorded as a direct selection. Answered groups are excluded until reopened. For many entries, sector labels become numbers or are hidden; the exact-chance list remains readable and sectors retain proportional area.
 
@@ -77,17 +79,19 @@ The server chooses one result with Node's cryptographic `randomInt`, creates a p
 
 ## Architecture and limits
 
-React + TypeScript frontend; Express + TypeScript backend; server-side OAuth/session cookies; Twitch EventSub WebSocket; OpenAI Responses API; atomic JSON writes. The dashboard, viewer space, and read-only OBS view share a single server. Polling is once per second; absolute server time drives animation, so late views catch up. Network delay can cause brief visual skew, but the authoritative winner is shared.
+React + TypeScript frontend; Express + TypeScript backend; server-side OAuth/session cookies; Twitch EventSub WebSocket; OpenAI Responses and Embeddings APIs; transactional SQLite persistence. The dashboard, viewer space, and read-only OBS view share a single server. Polling is once per second; absolute server time drives animation, so late views catch up. Network delay can cause brief visual skew, but the authoritative winner is shared.
 
-This is a single-channel, single-process prototype. JSON state has no multi-process locking or retention UI. Session and OAuth tokens stay in memory; a restart requires signing in and reconnecting. Express's development MemoryStore is not a production session store. State files contain viewer identifiers and original questions: restrict access and establish retention before hosting. No secrets are persisted or logged. Use a persistent encrypted token/session store, database transactions, audit logs, retention controls, shared rate limiting, and configured HTTPS before operating a hosted service at scale.
+This is a single-channel, single-process application. A process lease rejects another process using the same data file. It is not a horizontally scaled service. SQLite uses WAL transactions; startup validates state, imports existing JSON without deleting it, and can recover invalid state from validated snapshots/backups. Keep the whole data directory private and backed up.
 
-Messages are capped at 500 characters; written answers at 2,000. Web input is limited to 30 actions per user per minute. The AI queue holds at most 100 waiting groups and makes no parallel calls; overflow questions remain separate. Candidate retrieval is intentionally bounded and may miss multilingual matches, especially on large channels. There is no automatic semantic evaluation without credentials, and live Twitch permissions/reconnection still require verification with your account. An OBS link is a bearer capability: anyone possessing it can see the current presentation, but cannot control it. Anyone visiting Viewer space must authenticate, even to submit a question.
+Browser sessions and Twitch credentials are encrypted with AES-256-GCM using a key derived from `SESSION_SECRET`; without an explicit secret, local development creates a private adjacent `.key` file. The OBS token is persisted encrypted as well. Keep the same signing/encryption secret and data directory across restarts. Changing the secret invalidates saved credentials and sessions. Production still requires an explicit strong `SESSION_SECRET` and configured HTTPS. OAuth credentials refresh through a single shared refresh request and are revalidated when restored; revoked credentials require reconnecting. Disconnect removes saved Twitch credentials. No credentials are logged.
 
-No audio capture, transcription, generated answers, calls, payments, betting, Twitch Extension, are included. Public chat replies reuse approved written answers only.
+Messages are capped at 500 characters; written answers at 2,000. Web input is limited to 30 actions per user per minute. The AI inbox and grouping queue each hold at most 100 entries and are processed serially. Jobs persist across restart and retry up to three times with backoff; **Reprocess open questions** retries exhausted jobs. Per-viewer Twitch intake is capped at ten messages per minute and web actions at thirty. Candidate retrieval is intentionally bounded and may miss multilingual matches, especially on large channels. There is no automatic semantic evaluation without credentials, and live Twitch permissions/reconnection still require verification with your account. An OBS link is a bearer capability: anyone possessing it can see the current presentation, but cannot control it. Anyone visiting Viewer space must authenticate, even to submit a question.
+
+No audio capture, transcription, generated answers, calls, payments, betting, or Twitch Extension are included. Public chat replies reuse approved written answers only.
 
 ## Hackathon delivery
 
-See [demo script and submission checklist](docs/DEMO.md). This project was implemented with Codex for architecture, source generation, UI, tests, and documentation. Save the **actual Codex session ID** from the app and record development clips now. Do not substitute the workspace directory name for the session ID. No repository has been published and no app has been deployed.
+See [demo script and submission checklist](docs/DEMO.md). This project was implemented with Codex for architecture, source generation, UI, tests, and documentation. Save the **actual Codex session ID** from the app and record development clips now. Do not substitute the workspace directory name for the session ID. Repository changes are pushed only when authorized; app deployment is a separate action.
 
 Official sources checked October 24, 2026:
 
@@ -104,17 +108,17 @@ ChatSpin is licensed under the [MIT License](LICENSE). Third-party dependencies 
 
 ## Start fresh
 
-The streamer dashboard has separate **Clear questions** and **Clear participants** buttons under **Start fresh**. Each opens a confirmation dialog. Only the broadcaster or explicitly authorized moderators may clear collections, and clearing is blocked during a spin.
+The streamer dashboard has separate **Clear questions and answers** and **Clear participants** buttons under **Start fresh**. Each opens a confirmation dialog. Only the broadcaster or explicitly authorized moderators may clear collections, and clearing is blocked during a spin.
 
-Clearing questions removes all groups, originals, support, saved answers, and any question draw from the current session; it preserves participants. Clearing participants removes registrations and any participant draw; it preserves questions and saved answers. Registration settings and usage totals stay unchanged. Clearing questions also empties the waiting AI queue; an active grouping batch must finish first. New incoming chat commands can create fresh entries afterward.
+Clearing questions removes all groups, originals, support, saved answers, reply jobs/history, and any question draw from the current session; it preserves participants. Clearing participants removes registrations and any participant draw; it preserves questions and saved answers. Registration settings and usage totals stay unchanged. Clearing questions also empties the waiting AI queue; an active grouping batch must finish first. New incoming chat commands can create fresh entries afterward.
 
-Before either action, the server saves a full session snapshot in a `backups/` directory alongside `DATA_FILE`, including for demo sessions. A failed backup prevents clearing. Backups contain viewer data and must remain private; the default `data/` location is excluded from Git. To recover a snapshot, stop the server, preserve the current state file, copy the chosen backup over `DATA_FILE`, then restart and reconnect Twitch. No restore endpoint is exposed to viewers.
+Before either action, the server saves a full session snapshot in a `backups/` directory alongside `DATA_FILE`, including for demo sessions. A failed backup prevents clearing. Backups contain viewer data and must remain private; the default `data/` location is excluded from Git. To recover a snapshot, stop the server and run `npm run restore -- /absolute/path/to/backup.json`, then restart. The restore command validates the backup and preserves a pre-restore snapshot. Copying JSON over `DATA_FILE` does not replace an already imported SQLite state. No restore endpoint is exposed to viewers.
 
 ## Automatic chat questions
 
 Viewers can ask ordinary questions in Twitch chat without a command. ChatSpin captures messages with question marks (`?`, `¿`, `？`, or `؟`), and common English or Spanish question openings even without punctuation (for example, `Who are you` or `Cómo empezaste a transmitir`). Original wording and language are preserved. URL query strings alone do not trigger detection, and unrelated chat commands are excluded.
 
-Detection uses local text rules, so it has no additional model-call cost. It is a heuristic, not a guarantee of recognizing every question or rejecting every rhetorical statement. Other languages work with question marks; unrecognized or unusually worded questions can still be submitted with `!ask your question` or through Viewer space. The explicit command remains available for questions without recognizable punctuation or openings. Messages must contain text and fit within the 500-character limit. Only new EventSub messages are processed; disconnected messages are not replayed.
+Recognizable questions and `!ask` enter immediately through local rules. Other ordinary messages are batched for semantic question detection with structured outputs, including indirect requests and other languages. Commands and empty/oversized messages are excluded. Detection makes API calls and shares the same hard call/token budget as grouping and embeddings. Original text is preserved; the model never writes answers. Without an API key, only locally recognized questions are accepted. Only new EventSub messages are processed; disconnected messages are not replayed.
 
 ## OBS candidate synchronization
 
@@ -127,3 +131,15 @@ In **Review & answer**, the fixed bottom action bar has one **Mark answered** bu
 ## Automatic approved-answer replies
 
 Replies are sent from the connected broadcaster account. The server sends at most one message part every two seconds, suppresses repeats to the same user and question for one minute, and retains that cooldown across restarts. Answers longer than Twitch’s message limit are split without rewriting. The queue holds at most 50 answers and expires jobs after five minutes; edited, reopened, or cleared answers invalidate queued replies. Failed or moderation-held messages are reported in the dashboard and are not automatically retried. No generated answer is posted. Tests use mocked Twitch endpoints; verify live delivery after reconnecting with write permission.
+
+## Live session controls, budgets, and retention
+
+**Start new live session** creates a new logical broadcast without deleting history. New written answers default to **This live session only**; select **Across live sessions** only for answers that should remain valid. Repeated questions cannot use an expired session answer. Restarting the process does not start a new live session.
+
+Under **Live session & automation**, pause/resume public replies, reprocess open questions, inspect the latest 100 reply records, and configure limits. Defaults are 200 AI API requests and 200,000 reserved/actual tokens per live session, 2,000 groups, and 30 days of question retention. Calls are reserved before network access; failures retain conservative reservations. Token ceilings are not currency budgets, and embedding requests count too. Starting a new live session resets the AI budget.
+
+An hourly maintenance task archives state before removing questions older than the selected retention period. SQLite keeps the last 20 snapshots. Explicit clear operations also produce private JSON backups; these backups are not automatically purged. Store/export anything you need before reducing retention. Removing expired content does not clear participant registrations.
+
+Public reply jobs survive restart, send at most one message part every two seconds, and expire after five minutes. A network send with uncertain outcome is not retried automatically, preventing duplicate public posts. History reports sent, failed/held, partial, or cancelled jobs. Messages arriving while grouping is running are tracked individually, including multiple viewers asking the same question.
+
+The frontend separates dashboard, OBS, review dialog, automation controls, types, and request logic. Polling is serialized; action-triggered reloads wait for stale polls and then fetch fresh state.

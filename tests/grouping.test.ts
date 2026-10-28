@@ -52,3 +52,10 @@ test('Contextual groups cannot extend the time window through chained arrivals',
   applyDecisions(state, [b,c], [a], [{source:b.id,target:a.id,confidence:'contextual',title:'Project'}, {source:c.id,target:b.id,confidence:'contextual',title:'Project'}]);
   assert.equal(state.groups.length, 2); assert.equal(a.questions.length, 2);
 });
+
+
+test('Model-detected temporary questions cannot reuse an old written answer',()=>{
+ const state=emptyState();const old=addQuestion(state,{id:'a',name:'A'},'Describe the project on your screen',undefined,Date.now()-1800000);old.status='written';old.answer='The earlier project';
+ const fresh=addQuestion(state,{id:'b',name:'B'},'Which project are you showing?');
+ applyDecisions(state,[fresh],[old],[{source:fresh.id,target:old.id,confidence:'equivalent',timeSensitive:true,title:'Current screen project'}]);assert.equal(state.groups.length,2);
+});

@@ -3,3 +3,11 @@ dist/
 data/
 .env
 *.log
+
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.key
+backups/

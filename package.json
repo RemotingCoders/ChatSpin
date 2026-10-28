@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "start": "NODE_ENV=production node --import tsx server/index.ts",
     "test": "node --import tsx --test tests/*.test.ts",
-    "test:ai": "node --import tsx tests/evaluate-ai.ts"
+    "test:ai": "node --import tsx tests/evaluate-ai.ts",
+    "restore": "node --import tsx server/restore.ts"
   },
   "dependencies": {
     "react": "^19.2.0",
@@ -31,5 +32,8 @@
     "typescript": "^5.9.3",
     "tsx": "^4.20.6"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "engines": {
+    "node": ">=24.0.0"
+  }
 }
