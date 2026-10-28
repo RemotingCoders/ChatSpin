@@ -29,8 +29,19 @@ test('HTTP authorization, privacy, origin protection, duplicate support, and OBS
     const initialOverlay=await (await call(overlayPath)).json();
     assert.equal(initialOverlay.spin,null); assert.deepEqual(initialOverlay.entries,initialState.entries); assert.ok(initialOverlay.entries.length>0);
     assert.equal(initialOverlay.groups,undefined); assert.equal(initialOverlay.participants,undefined);
+    assert.equal((await call('/api/action',admin,{type:'question-language',value:'es'})).status,200);
+    assert.equal((await call('/api/action',admin,{type:'ui-language',value:'ru'})).status,200);
+    const localized=await (await call('/api/state',admin)).json();const localizedOBS=await (await call(initialOverlayUrl.pathname.replace('/obs','/api/overlay')+initialOverlayUrl.search)).json();
+    assert.equal(localized.groups[0].text,'¿En qué te enfocarías para hacer crecer una comunidad pequeña en Twitch?');
+    assert.equal(localized.groups[0].questions[0].text,initialState.groups[0].questions[0].text);
+    assert.equal((await call('/api/action',admin,{type:'edit',id:localized.groups[0].id,title:'Mi comunidad',value:'es'})).status,200);
+    const editedLanguage=await (await call('/api/state',admin)).json();assert.equal(editedLanguage.groups[0].title,'Mi comunidad');assert.equal(editedLanguage.groups[0].questions[0].text,initialState.groups[0].questions[0].text);
+    assert.equal(localizedOBS.uiLanguage,'ru');assert.deepEqual(localizedOBS.entries,localized.entries);
+    assert.equal((await call('/api/action',admin,{type:'question-language',value:'fr'})).status,400);
+    await call('/api/action',admin,{type:'question-language',value:'original'});await call('/api/action',admin,{type:'ui-language',value:'en'});
 
-    for (const type of ['spin','answer','merge','split','settings','registration','reopen','clear-questions','clear-participants','new-session','pause-replies','limits','reprocess','rotate-obs']) assert.equal((await call('/api/action',alice,{type})).status,403);
+
+    for (const type of ['spin','answer','merge','split','settings','registration','reopen','clear-questions','clear-participants','new-session','pause-replies','limits','reprocess','rotate-obs','ui-language','question-language']) assert.equal((await call('/api/action',alice,{type})).status,403);
     await call('/api/action',alice,{type:'ask',text:'My private original question'});
     let a=await (await call('/api/state',alice)).json();
     const own=a.groups.find((g: {text:string})=>g.text==='My private original question');
@@ -62,7 +73,7 @@ test('HTTP authorization, privacy, origin protection, duplicate support, and OBS
     assert.deepEqual(overlay.spin,dashboard.spin); assert.equal(overlay.groups,undefined); assert.equal(dashboard.spin.winner,own.id);
     await call('/api/action',admin,{type:'spin'});
     assert.equal((await call('/api/action',admin,{type:'spin'})).status,409);
-    for (const type of ['clear-questions','clear-participants','new-session','pause-replies','limits','reprocess','rotate-obs']) assert.equal((await call('/api/action',admin,{type,confirmed:true})).status,409);
+    for (const type of ['clear-questions','clear-participants','question-language']) assert.equal((await call('/api/action',admin,{type,confirmed:true})).status,409);
     await new Promise(resolve => setTimeout(resolve, 6100));
     await call('/api/action',alice,{type:'join'});
     const beforeClear=await (await call('/api/state',admin)).json();

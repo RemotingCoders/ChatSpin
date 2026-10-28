@@ -1,5 +1,7 @@
 import 'dotenv/config';
 import { settings, retain, bindBudget } from './limits.ts';
+import {questionPresentation,presentedSpin} from './presentation.ts';
+import {TranslationWork} from './translation.ts';
 import { Repository, PersistentSessions } from './storage.ts';
 import { timedFetch } from './http.ts';
 import express from 'express';
@@ -68,11 +70,12 @@ const replies = new ApprovedReplies(() => real, async (message, parentId) => {
 setInterval(() => { void replies.flush().catch(() => { replies.status = 'Reply persistence failed — inspect storage'; }); }, 2000);
 const work = new QuestionWork(real, persist, messages => detectQuestions(messages, real), ids => groupBatch(real, ids), (group, user, messageId) => { replies.enqueue(group, user, messageId); });
 persist();
+const translator=new TranslationWork(real,persist);
 const enqueue = (id: string) => work.enqueue(id);
 const locked = (s: State) => !!s.spin && s.spin.end > Date.now();
 setInterval(() => {
-    if (!locked(real) && process.env.OPENAI_API_KEY)
-        void work.tick().catch(() => { work.status = 'Processing failed; retained for retry'; });
+    if (!locked(real) && !work.busy && !translator.busy && process.env.OPENAI_API_KEY)
+        void (async()=>{await work.tick();await translator.tick();})().catch(()=>{work.status='Processing failed; retained for retry';});
 }, 2500);
 function ingest(user: User, text: string, messageId?: string) {
     if (messageId&&(process.env.OPENAI_API_KEY||extractChatQuestion(text)))
@@ -102,7 +105,7 @@ if (storedCredentials && process.env.TWITCH_BROADCASTER_ID) {
 }
 const isController = (req: express.Request) => !!req.session.user && (req.session.demo ? req.session.demoController === true : req.session.user.id === process.env.TWITCH_BROADCASTER_ID || (process.env.MODERATOR_IDS || '').split(',').includes(req.session.user.id));
 const stateFor = (req: express.Request) => req.session.demo ? demo : real;
-app.get('/api/session', (req, res) => res.json({ user: req.session.user || null, controller: isController(req), demo: !!req.session.demo, demoEnabled: process.env.ENABLE_DEMO !== 'false' && !production, configured: !!(process.env.TWITCH_CLIENT_ID && process.env.TWITCH_CLIENT_SECRET && process.env.TWITCH_BROADCASTER_ID), storageNotice: repository.warning, ai: process.env.OPENAI_API_KEY ? work.status : 'Not configured — explicit questions only', chatReplies: twitch?.canWriteChat ? replies.status : 'Reconnect Twitch to enable public approved-answer replies', connection: twitch?.status || 'Disconnected' }));
+app.get('/api/session', (req, res) => res.json({ user: req.session.user || null, controller: isController(req), demo: !!req.session.demo, demoEnabled: process.env.ENABLE_DEMO !== 'false' && !production, configured: !!(process.env.TWITCH_CLIENT_ID && process.env.TWITCH_CLIENT_SECRET && process.env.TWITCH_BROADCASTER_ID), uiLanguage:(req.session.demo?demo:real).uiLanguage||'en',storageNotice: repository.warning, ai: process.env.OPENAI_API_KEY ? work.status : 'Not configured — explicit questions only', chatReplies: twitch?.canWriteChat ? replies.status : 'Reconnect Twitch to enable public approved-answer replies', connection: twitch?.status || 'Disconnected' }));
 app.post('/api/demo', (req, res) => {
     if (production || process.env.ENABLE_DEMO === 'false')
         return res.sendStatus(404);
@@ -175,18 +178,18 @@ app.use('/api', (req, res, next) => {
 });
 app.get('/api/state', (req, res) => {
     const s = stateFor(req), controller = isController(req), id = req.session.user!.id;
-    res.json({ ...s, replyHistory: undefined, replyJobs: undefined, replyLog: controller ? s.replyLog : undefined, aiJobs: undefined, pendingMessages: undefined, settings: controller ? settings(s) : undefined, aiBudget: controller ? s.aiBudget : undefined, entries: controller ? eligibleEntries(s) : undefined, groups: s.groups.map(g => ({ ...g, supporters: undefined, answerHistory: controller ? g.answerHistory : undefined, embedding: undefined, aiProcessed: controller ? g.aiProcessed : undefined, answerActive: answerIsActive(s, g), count: support(g), questions: controller ? g.questions : g.questions.filter(q => q.user.id === id), review: controller ? g.review : undefined, answer: (controller || (answerIsActive(s, g) && g.questions.some(q => q.user.id === id))) ? g.answer : '' })), participants: controller ? s.participants : s.participants.filter(p => p.id === id), obsUrl: controller ? `${origin}/obs?token=${req.session.demo ? obsTokens.demo : obsTokens.real}` : undefined, serverTime: Date.now() });
+    res.json({ ...s,spin:presentedSpin(s),translationStatus:translator.status, replyHistory: undefined, replyJobs: undefined, replyLog: controller ? s.replyLog : undefined, aiJobs: undefined, pendingMessages: undefined, settings: controller ? settings(s) : undefined, aiBudget: controller ? s.aiBudget : undefined, entries: controller ? eligibleEntries(s) : undefined, groups: s.groups.map(g => ({ ...g, text:questionPresentation(s,g).text,title:questionPresentation(s,g).title,displayLanguage:s.questionLanguage||'original',originalText:g.text,originalTitle:g.customTitle||g.text,translationPending:questionPresentation(s,g).pending,translations:undefined,translationAttempts:undefined,supporters: undefined, answerHistory: controller ? g.answerHistory : undefined, embedding: undefined, aiProcessed: controller ? g.aiProcessed : undefined, answerActive: answerIsActive(s, g), count: support(g), questions: controller ? g.questions : g.questions.filter(q => q.user.id === id), review: controller ? g.review : undefined, answer: (controller || (answerIsActive(s, g) && g.questions.some(q => q.user.id === id))) ? g.answer : '' })), participants: controller ? s.participants : s.participants.filter(p => p.id === id), obsUrl: controller ? `${origin}/obs?token=${req.session.demo ? obsTokens.demo : obsTokens.real}` : undefined, serverTime: Date.now() });
 });
 app.get('/api/overlay', (req, res) => {
     const token = req.query.token;
     const s = token === obsTokens.demo ? demo : token === obsTokens.real ? real : undefined;
     if (!s)
         return res.status(403).json({ error: 'Open the OBS link from the streamer dashboard.' });
-    res.json({ spin: s.spin, entries: eligibleEntries(s), demo: s.demo, mode: s.mode, serverTime: Date.now() });
+    res.json({ spin:presentedSpin(s),questionLanguage:s.questionLanguage||'original',uiLanguage:s.uiLanguage||'en',translationPending:s.groups.some(g=>questionPresentation(s,g).pending),entries: eligibleEntries(s), demo: s.demo, mode: s.mode, serverTime: Date.now() });
 });
 setInterval(() => { try {
     repository.cleanup();
-    if (!work.busy && !locked(real)) {
+    if (!work.busy && !translator.busy && !locked(real)) {
         repository.snapshot(real);
         if (retain(real))
             persist();
@@ -210,9 +213,9 @@ app.post('/api/action', (req, res) => {
         return res.status(429).json({ error: 'Please wait before sending more actions.' });
     recent.push(Date.now());
     rates.set(user.id, recent);
-    if (locked(s) && !publicActions.includes(action.type))
+    if (locked(s) && !publicActions.includes(action.type) && action.type!=='ui-language')
         return res.status(409).json({ error: 'Wait for the current spin to finish.' });
-    if (work.busy && !req.session.demo && ['merge', 'split', 'answer', 'live', 'reopen', 'spin', 'edit', 'clear-questions', 'new-session', 'reprocess'].includes(action.type))
+    if ((work.busy||translator.busy) && !req.session.demo && ['merge', 'split', 'answer', 'live', 'reopen', 'spin', 'edit', 'clear-questions', 'new-session', 'reprocess'].includes(action.type))
         return res.status(409).json({ error: 'Grouping is in progress. Please try again shortly.' });
     if(!s.demo&&replies.isSending&&['clear-questions','new-session'].includes(action.type))return res.status(409).json({error:'Wait for the current public reply to finish.'});
     const group = s.groups.find(g => g.id === action.id);
@@ -280,11 +283,15 @@ app.post('/api/action', (req, res) => {
             group.answer = '';
             group.aiProcessed = false;
             break;
-        case 'edit':
-            if (!group)
-                throw new Error('Question not found.');
-            group.title = z.string().trim().min(1).max(60).parse(action.title);
+        case 'edit': {
+            if(!group)throw new Error('Question not found.');
+            const language=s.questionLanguage||'original';
+            if(action.value&&action.value!==language)throw new Error('Question language changed. Reopen the question before editing its title.');
+            const title=z.string().trim().min(1).max(60).parse(action.title);
+            if(language==='original'){group.title=title;group.customTitle=title;}
+            else{const cached=group.translations?.[language];if(!cached||questionPresentation(s,group).pending)throw new Error('Wait for translation before editing this title.');cached.title=title;}
             break;
+        }
         case 'merge': {
             const originals = s.groups.find(g => g.id === action.id)?.questions || [];
             merge(s, action.id!, action.target!, true, action.value === 'source' || action.value === 'target' ? action.value : undefined);
@@ -325,7 +332,7 @@ app.post('/api/action', (req, res) => {
             s.repliesPaused = z.boolean().parse(action.value);
             break;
         case 'limits':
-            if (work.busy && !s.demo)
+            if ((work.busy||translator.busy) && !s.demo)
                 throw new Error('Wait for AI processing before changing limits.');
             s.settings = z.object({ aiCallLimit: z.number().int().min(0).max(10000), aiTokenLimit: z.number().int().min(0).max(10000000), retentionDays: z.number().int().min(1).max(365), maxGroups: z.number().int().min(10).max(10000) }).parse(JSON.parse(action.text || '{}'));
             break;
@@ -347,9 +354,10 @@ app.post('/api/action', (req, res) => {
             repository.putSecret('obs', obsTokens);
             break;
         }
+        case 'ui-language': s.uiLanguage=z.enum(['en','es','ru','de']).parse(action.value);break;
+        case 'question-language': if(!s.demo&&!process.env.OPENAI_API_KEY&&action.value!=='original')throw new Error('Configure OpenAI to translate questions.');s.questionLanguage=z.enum(['original','en','es','ru','de']).parse(action.value);if(!s.demo)translator.retry();break;
         case 'reprocess':
-            if (!s.demo)
-                work.retry();
+            if(!s.demo){work.retry();translator.retry();}
             break;
         case 'disconnect':
             if (user.id !== process.env.TWITCH_BROADCASTER_ID && !s.demo)

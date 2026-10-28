@@ -1,3 +1,5 @@
+import {seedDemoTranslations} from './demoTranslations.ts';
+import {questionPresentation,type QuestionLanguage,type QuestionTranslation} from './presentation.ts';
 import { randomInt, randomUUID } from 'node:crypto';
 export type User = {
     id: string;
@@ -12,6 +14,7 @@ export type Question = {
     messageId?: string;
 };
 export type Group = {
+ customTitle?:string;translations?:Partial<Record<'en'|'es'|'ru'|'de',QuestionTranslation>>;translationAttempts?:Partial<Record<'en'|'es'|'ru'|'de',{source:string;attempts:number;next:number}>>;
     id: string;
     title: string;
     text: string;
@@ -48,6 +51,7 @@ export type Spin = {
     end: number;
 };
 export type State = {
+ questionLanguage?:QuestionLanguage;uiLanguage?:'en'|'es'|'ru'|'de';
     groups: Group[];
     participants: (User & {
         selected: boolean;
@@ -181,7 +185,7 @@ export function split(s: State, groupId: string, questionId: string) {
 }
 export function eligibleEntries(s: State) {
     return s.mode === 'questions'
-        ? s.groups.filter(g => g.status === 'pending').map(g => ({ id: g.id, label: g.title, weight: s.odds === 'support' ? support(g) : 1 }))
+        ? s.groups.filter(g => g.status === 'pending').map(g => ({ id: g.id, label: questionPresentation(s,g).title, weight: s.odds === 'support' ? support(g) : 1 }))
         : s.participants.filter(p => !s.excludeSelected || !p.selected).map(p => ({ id: p.id, label: p.name, weight: 1 }));
 }
 export function spin(s: State, manualId?: string, now = Date.now()): Spin {
@@ -201,7 +205,7 @@ export function spin(s: State, manualId?: string, now = Date.now()): Spin {
         winner = candidates.find(c => (ticket -= c.weight) < 0)!;
     }
     const question = s.groups.find(g => g.id === winner.id);
-    s.spin = { id: randomUUID(), mode: s.mode, candidates, winner: winner.id, label: winner.label, text: question?.text || winner.label, start: now, end: now + (manualId ? 0 : 6000) };
+    s.spin = { id: randomUUID(), mode: s.mode, candidates, winner: winner.id, label: winner.label, text: question?questionPresentation(s,question).text:winner.label, start: now, end: now + (manualId ? 0 : 6000) };
     if (s.mode === 'participants')
         s.participants.find(p => p.id === winner.id)!.selected = true;
     return s.spin;
@@ -221,6 +225,7 @@ export function demoState() {
         g.title = title;
         g.supporters = Array.from({ length: count - 1 }, (_, i) => `${title}-${i}`);
     }
+    seedDemoTranslations(s.groups);
     s.participants = ['pixelpilot', 'lunarose', 'cozycat', 'mintbyte', 'orbit'].map(name => ({ id: `sample-${name}`, name, selected: false }));
     return s;
 }

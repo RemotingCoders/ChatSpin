@@ -2,7 +2,7 @@
 
 Give your Twitch community a turn. ChatSpin organizes interview questions and selects a question or a volunteer with a synchronized wheel.
 
-Built from an empty directory with Codex during the Codex x TwitchCon Hackathon submission period. All application text and documentation are in English; viewers' original questions retain their language.
+Built from an empty directory with Codex during the Codex x TwitchCon Hackathon submission period. The interface supports English, Spanish, Russian and German. Question presentation can preserve the original language or use any of those four languages; original viewer messages remain intact. Documentation is in English.
 
 ## Run locally
 
@@ -143,3 +143,16 @@ An hourly maintenance task archives state before removing questions older than t
 Public reply jobs survive restart, send at most one message part every two seconds, and expire after five minutes. A network send with uncertain outcome is not retried automatically, preventing duplicate public posts. History reports sent, failed/held, partial, or cancelled jobs. Messages arriving while grouping is running are tracked individually, including multiple viewers asking the same question.
 
 The frontend separates dashboard, OBS, review dialog, automation controls, types, and request logic. Polling is serialized; action-triggered reloads wait for stale polls and then fetch fresh state.
+
+## Interface and question languages
+
+Two independent settings are available:
+
+- **Interface language**, in the header: English, Español, Русский, or Deutsch. The browser remembers the choice. A streamer/controller change also saves the shared OBS interface language; viewers can choose their own interface locally.
+- **Question language**, under **Live session & automation → Language settings**: original, English, Spanish, Russian, or German. It controls question titles, the full spotlight question, the queue, and OBS. Originals remain available in the review dialog, and cross-language equivalence still uses original messages.
+
+Question translations use structured model output, are cached separately per language and source, and share the same AI call/token budget. When unavailable or pending, originals remain visible with a dashboard notice; questions are never dropped or answered by the translation model. Configure OpenAI before selecting a forced question language in a real workspace. Reprocessing retries exhausted translations. Changing the question language is blocked during an active draw; an already running animation retains its frozen labels until completion.
+
+Editing a title in a forced language updates that language's display title without rewriting the original question or other languages. Editing the title in original mode changes the source title and invalidates stale translations. Approved written answers are not automatically translated or rewritten.
+
+The labeled demo has prepared question translations in all four languages and makes no runtime model calls. UI catalogs are static, so changing interface language has no API cost. Developers can add missing UI strings with `node --import tsx scripts/generate-locales.ts`; this optional maintenance tool makes paid API calls with public UI strings only and preserves existing translations.
