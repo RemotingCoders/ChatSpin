@@ -25,7 +25,7 @@ export class SupabaseRepository {
    // Never surface provider bodies: they may contain submitted data or configuration.
    throw Error('ChatSpin database request failed. Check server configuration and migration.');
   }
-  return response.status===204?undefined:response.json();
+  const text=await response.text();return text?JSON.parse(text):undefined;
  }
  async load(channelId:string):Promise<ChannelState>{
   const id=this.channel(channelId),filter='channel_id=eq.'+id;
