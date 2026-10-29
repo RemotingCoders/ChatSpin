@@ -1,5 +1,5 @@
 import {useI18n} from './i18n';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Act, ViewState } from './types';
 export function OperationsPanel({ state, busy, inSpin, act }: {
     state: ViewState;
@@ -8,11 +8,13 @@ export function OperationsPanel({ state, busy, inSpin, act }: {
     act: Act;
 }) {
  const {t,formatDate}=useI18n();
+ const [pendingLanguage,setPendingLanguage]=useState<string|null>(null);
+ useEffect(()=>{if(pendingLanguage===(state.questionLanguage||'original'))setPendingLanguage(null);},[state.questionLanguage,pendingLanguage]);
     const [confirm, setConfirm] = useState<'new-session' | 'rotate-obs' | null>(null);
     const [limits, setLimits] = useState(state.settings || { aiCallLimit: 200, aiTokenLimit: 200000, retentionDays: 30, maxGroups: 2000 });
     return <section className="panel operations-panel">
     <h2>{t("Live session & automation")}</h2>
-    <fieldset className="language-settings"><legend>{t('Language settings')}</legend><label>{t('Question language')}<select aria-label={t('Question language')} disabled={busy||inSpin} value={state.questionLanguage||'original'} onChange={e=>act('question-language',{value:e.target.value})}><option value="original">{t('Original language')}</option><option value="en">{t('English')}</option><option value="es">{t('Spanish')}</option><option value="ru">{t('Russian')}</option><option value="de">{t('German')}</option></select></label><p className="help">{t('Translations keep original messages unchanged.')}</p>{state.groups.some(g=>g.translationPending)&&<p className="help" role="status">{t('Translation pending — showing original text.')}</p>}{state.translationStatus&&state.translationStatus!=='Ready'&&<p className="help">{t(state.translationStatus)}</p>}</fieldset>
+    <fieldset className="language-settings"><legend>{t('Language settings')}</legend><label>{t('Question language')}<select aria-label={t('Question language')} disabled={busy||inSpin} value={pendingLanguage??state.questionLanguage??'original'} onChange={async e=>{const value=e.target.value;setPendingLanguage(value);if(!await act('question-language',{value}))setPendingLanguage(null);}}><option value="original">{t('Original language')}</option><option value="en">{t('English')}</option><option value="es">{t('Spanish')}</option><option value="ru">{t('Russian')}</option><option value="de">{t('German')}</option></select></label><p className="help">{t('Translations keep original messages unchanged.')}</p>{state.groups.some(g=>g.translationPending)&&<p className="help" role="status">{t('Translation pending — showing original text.')}</p>}{state.translationStatus&&state.translationStatus!=='Ready'&&<p className="help">{t(state.translationStatus)}</p>}</fieldset>
     <p className="help">{t("Starting a new live session keeps your history and stops reuse of session-only answers. Permanent answers remain active.")}</p>
     <div className="operations-buttons">
     <button className="secondary" disabled={busy || inSpin} onClick={() => setConfirm('new-session')}>{t("Start new live session")}</button>

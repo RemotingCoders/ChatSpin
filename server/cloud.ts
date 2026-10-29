@@ -11,6 +11,7 @@ import {processCloudChannel} from './cloud-work.js';
 import {questionPresentation,presentedSpin} from './presentation.js';
 import {answerIsActive,eligibleEntries,support} from './domain.js';
 import {settings} from './limits.js';
+import {languageSchema} from '../extension/server/service.js';
 
 export function createCloudApp(repository:SupabaseRepository,origin:string,secret:string,background:(promise:Promise<unknown>)=>void=waitUntil){
  const app=express();app.disable('x-powered-by');app.set('trust proxy',1);
@@ -32,26 +33,34 @@ export function createCloudApp(repository:SupabaseRepository,origin:string,secre
  app.get('/api/session',async(req,res)=>{
   const user=req.session.user;
   const status=user?await repository.getSecret<{status:string}>(user.id,'chat-status'):undefined;
-  res.json({user:user||null,controller:!!user,demo:false,demoEnabled:false,configured:!!(process.env.TWITCH_CLIENT_ID&&process.env.TWITCH_CLIENT_SECRET),uiLanguage:user?(await repository.load(user.id)).state.uiLanguage||'en':'en',storageNotice:'',ai:process.env.OPENAI_API_KEY?'Ready':'Not configured — explicit questions only',chatReplies:status?.status==='Connected'?'Ready':'Connect Twitch to enable public replies',connection:status?.status||'Disconnected'});
+  res.json({user:user||null,controller:!!user,demo:false,demoEnabled:false,configured:!!(process.env.TWITCH_CLIENT_ID&&process.env.TWITCH_CLIENT_SECRET),uiLanguage:user?(await repository.load(user.id)).state.uiLanguage||'en':'en',storageNotice:'',ai:process.env.OPENAI_API_KEY?(user?(await repository.load(user.id)).state.cloudStatus?.ai||'Ready':'Ready'):'Not configured — explicit questions only',chatReplies:status?.status==='Connected'?'Ready':'Connect Twitch to enable public replies',connection:status?.status||'Disconnected'});
  });
  const token=(s:CloudState,channel:string)=>{const version=(s as CloudState&{cloudObsVersion?:string}).cloudObsVersion||'0';const content=channel+':'+version;return content+':'+createHmac('sha256',secret).update('chatspin.obs:'+content).digest('hex');};
  app.get('/api/overlay',async(req,res)=>{
   const supplied=typeof req.query.token==='string'?req.query.token:'';
   if(!/^\d{1,30}:[a-f0-9]{1,64}:[a-f0-9]{64}$/.test(supplied))return res.sendStatus(403);
   const channel=supplied.split(':')[0],{state}=await repository.load(channel),expected=token(state,channel);
+  const displayLanguage=await repository.getSecret<typeof state.questionLanguage>(channel,'question-language');if(displayLanguage)state.questionLanguage=displayLanguage;
   if(supplied.length!==expected.length||!timingSafeEqual(Buffer.from(supplied),Buffer.from(expected)))return res.sendStatus(403);
   res.json({spin:presentedSpin(state),questionLanguage:state.questionLanguage||'original',uiLanguage:state.uiLanguage||'en',translationPending:state.groups.some(g=>questionPresentation(state,g).pending),entries:eligibleEntries(state),demo:false,mode:state.mode,serverTime:Date.now()});
  });
  app.use('/api',(req,res,next)=>req.session.user?next():res.status(401).json({error:'Sign in with Twitch.'}));
  app.get('/api/state',async(req,res)=>{
   const channel=req.session.user!.id,{state:s}=await repository.load(channel);
+  const displayLanguage=await repository.getSecret<typeof s.questionLanguage>(channel,'question-language');if(displayLanguage)s.questionLanguage=displayLanguage;
   // Explicitly omit server coordination metadata, inbox, tokens, budgets of other channels.
-  const {cloudLease,cloudRates,cloudTranslations,cloudMaintenance,...safe}=s;
+  const {cloudLease,cloudRates,cloudTranslations,cloudMaintenance,cloudStatus,...safe}=s;
   delete (safe as Record<string,unknown>).cloudEvents;delete (safe as Record<string,unknown>).cloudObsVersion;
-  res.json({...safe,replyJobs:undefined,replyHistory:undefined,pendingMessages:undefined,aiJobs:undefined,settings:settings(s),spin:presentedSpin(s),translationStatus:'Ready',entries:eligibleEntries(s),groups:s.groups.map(g=>({...g,text:questionPresentation(s,g).text,title:questionPresentation(s,g).title,originalText:g.text,originalTitle:g.customTitle||g.text,translationPending:questionPresentation(s,g).pending,translations:undefined,translationAttempts:undefined,embedding:undefined,supporters:undefined,count:support(g),answerActive:answerIsActive(s,g)})),obsUrl:origin+'/obs?token='+encodeURIComponent(token(s,channel)),serverTime:Date.now()});schedule(channel);
+  res.json({...safe,replyJobs:undefined,replyHistory:undefined,pendingMessages:undefined,aiJobs:undefined,settings:settings(s),spin:presentedSpin(s),translationStatus:s.cloudStatus?.translation||'Ready',entries:eligibleEntries(s),groups:s.groups.map(g=>({...g,text:questionPresentation(s,g).text,title:questionPresentation(s,g).title,originalText:g.text,originalTitle:g.customTitle||g.text,translationPending:questionPresentation(s,g).pending,translations:undefined,translationAttempts:undefined,embedding:undefined,supporters:undefined,count:support(g),answerActive:answerIsActive(s,g)})),obsUrl:origin+'/obs?token='+encodeURIComponent(token(s,channel)),serverTime:Date.now()});schedule(channel);
  });
  app.post('/api/action',async(req,res)=>{
   const user=req.session.user!,channel=user.id;
+  if(req.body?.type==='question-language'){
+   const language=languageSchema.parse(req.body.value),{state}=await repository.load(channel);
+   if(state.spin&&state.spin.end>Date.now())return res.status(409).json({error:'Wait for the current spin to finish.'});
+   if(!process.env.OPENAI_API_KEY&&language!=='original')return res.status(400).json({error:'Configure OpenAI to translate questions.'});
+   await repository.putSecret(channel,'question-language',language);schedule(channel);return res.json({ok:true});
+  }
   await repository.rate(channel,user.id);
   if(req.body?.type==='disconnect'){
    await repository.removeSecret(channel,'twitch');await repository.putSecret(channel,'chat-status',{status:'Disconnected'});

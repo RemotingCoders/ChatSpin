@@ -4,7 +4,7 @@ import {validateState} from './storage.js';
 
 export class StateConflict extends Error {constructor(){super('Channel changed. Please try again.');}}
 export type CloudLease={id:string;until:number};
-export type CloudState=State&{cloudLease?:CloudLease;cloudRates?:Record<string,number[]>;cloudMaintenance?:number;cloudTranslations?:Record<string,number>};
+export type CloudState=State&{cloudLease?:CloudLease;cloudRates?:Record<string,number[]>;cloudMaintenance?:number;cloudStatus?:{ai:string;translation:string};cloudTranslations?:Record<string,number>};
 export class ChannelBusy extends Error {status=409;constructor(){super('Channel is processing. Please try again shortly.');}}
 export type ChannelState={channelId:string;revision:number;state:CloudState};
 export class SupabaseRepository {

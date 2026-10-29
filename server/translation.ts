@@ -1,3 +1,4 @@
+import {aiFailure} from './ai-status.js';
 import OpenAI from 'openai';
 import {z} from 'zod';
 import {zodTextFormat} from 'openai/helpers/zod';
@@ -37,9 +38,9 @@ export class TranslationWork{
     g.translations||={};g.translations[language]={source:item.source,text:translated.text,title:translated.title};if(g.translationAttempts)delete g.translationAttempts[language];
    }
    this.status='Ready';
-  }catch{
+  }catch(error){
    for(const item of items){const g=this.state.groups.find(g=>g.id===item.id);if(!g||translationSource(g)!==item.source)continue;g.translationAttempts||={};const previous=g.translationAttempts[language];const attempts=previous?.source===item.source?previous.attempts+1:1;g.translationAttempts[language]={source:item.source,attempts,next:now+2**attempts*5000};}
-   this.status='Translation unavailable — originals preserved; check AI budget or reprocess';
+   this.status=aiFailure(error,'Translation unavailable — originals preserved; check AI budget or reprocess');
   }finally{this.busy=false;this.persist();}
  }
  retry(){for(const g of this.state.groups)g.translationAttempts={};this.persist();}

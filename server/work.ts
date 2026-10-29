@@ -1,3 +1,4 @@
+import {aiFailure} from './ai-status.js';
 import { addQuestion, answerIsActive, normalize, type Group, type State, type User } from './domain.js';
 import { extractChatQuestion } from './chat.js';
 export class QuestionWork {
@@ -111,12 +112,12 @@ export class QuestionWork {
                         else
                             this.state.pendingMessages = this.state.pendingMessages!.filter(x => x !== m);
                 }
-                catch {
+                catch (error) {
                     for (const m of messages) {
                         m.attempts++;
                         m.next = now + 2 ** m.attempts * 5000;
                     }
-                    this.status = 'Question detection failed — retry queued';
+                    this.status = aiFailure(error,'Question detection failed — retry queued');
                 }
             }
             const jobs = this.state.aiJobs!.filter(j => !j.failed && j.next <= now).slice(0, 5);
@@ -131,13 +132,13 @@ export class QuestionWork {
                     this.state.aiJobs = this.state.aiJobs!.filter(j => !jobs.includes(j));
                     this.status = 'Ready';
                 }
-                catch {
+                catch (error) {
                     for (const j of jobs) {
                         j.attempts++;
                         j.next = now + 2 ** j.attempts * 5000;
                         j.failed = j.attempts >= 3;
                     }
-                    this.status = 'Grouping failed — retry queued; use Reprocess if exhausted';
+                    this.status = aiFailure(error,'Grouping failed — retry queued; use Reprocess if exhausted');
                 }
             }
             this.deliver();

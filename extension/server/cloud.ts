@@ -31,6 +31,7 @@ export function cloudExtensionRouter(options:CloudExtensionOptions){
  }
  router.get('/state',async(req,res)=>{
   const c=res.locals.claims as ExtensionClaims,{state}=await options.repository.load(c.channel_id);
+  const configured=await options.repository.getSecret<typeof state.questionLanguage>(c.channel_id,'question-language');if(configured)state.questionLanguage=configured;
   const language=languageSchema.parse(req.query.language||state.questionLanguage||'original');
   if(language!=='original')try{await options.repository.mutate(c.channel_id,s=>{s.cloudTranslations||={};s.cloudTranslations[language]=Date.now();});}catch(error){if(!(error instanceof ChannelBusy)&&!(error instanceof StateConflict))throw error;}
   res.json(extensionState(state,actor(state,c),language));options.schedule?.(c.channel_id);

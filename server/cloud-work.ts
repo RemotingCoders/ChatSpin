@@ -11,12 +11,13 @@ import {TwitchConnection,type Credentials} from './twitch.js';
 
 export async function processCloudChannel(repository:SupabaseRepository,channel:string){
  const initial=await repository.load(channel),pendingInbox=await repository.inbox(channel),now=Date.now();
+ const displayLanguage=await repository.getSecret<typeof initial.state.questionLanguage>(channel,'question-language');if(displayLanguage)initial.state.questionLanguage=displayLanguage;
  const needsTranslation=(language:string)=>initial.state.groups.some(g=>{if(!['en','es','ru','de'].includes(language))return false;const lang=language as 'en'|'es'|'ru'|'de',source=translationSource(g),attempt=g.translationAttempts?.[lang];return g.translations?.[lang]?.source!==source&&(!attempt||attempt.source!==source||attempt.attempts<3&&attempt.next<=now);});
  const languages=[initial.state.questionLanguage||'original',...Object.entries(initial.state.cloudTranslations||{}).filter(([,at])=>at>now-60000).map(([lang])=>lang)];
  const aiDue=process.env.OPENAI_API_KEY&&((initial.state.aiJobs||[]).some(j=>!j.failed&&j.next<=now)||(initial.state.pendingMessages||[]).some(m=>m.next<=now)||languages.some(needsTranslation));
  if(!pendingInbox.length&&!aiDue&&!(initial.state.replyJobs||[]).length&&initial.state.cloudMaintenance&&initial.state.cloudMaintenance>now-3600000)return;
  let record;try{record=await repository.acquire(channel);}catch(error){if(error instanceof ChannelBusy||error instanceof StateConflict)return;throw error;}
- const state=record.state,deadline=Date.now()+100000;
+ const state=record.state;if(displayLanguage)state.questionLanguage=displayLanguage;state.cloudStatus||={ai:'Ready',translation:'Ready'};const deadline=Date.now()+100000;
  let writes=Promise.resolve();
  const persist=()=>{writes=writes.then(()=>{if(!state.cloudLease||state.cloudLease.until<=Date.now())throw new StateConflict();return repository.commit(record);});};
  const flush=()=>writes;
@@ -49,12 +50,12 @@ export async function processCloudChannel(repository:SupabaseRepository,channel:
    await repository.commit(record,true);retain(state);state.cloudMaintenance=Date.now();persist();await flush();
   }
   if(process.env.OPENAI_API_KEY&&(!state.spin||state.spin.end<Date.now())){
-   await work.tick();await flush();
+   await work.tick();state.cloudStatus.ai=work.status;persist();await flush();
    if(Date.now()<deadline){
     const translations=new TranslationWork(state,persist);
     const demanded=Object.entries(state.cloudTranslations||{}).filter(([,at])=>at>Date.now()-60000).map(([lang])=>lang);
     const language=[state.questionLanguage||'original',...demanded].find(needsTranslation) as 'en'|'es'|'ru'|'de'|undefined;
-    if(language)await translations.tick(Date.now(),language);await flush();
+    if(language)await translations.tick(Date.now(),language);state.cloudStatus.translation=translations.status;persist();await flush();
    }
   }
   if(Date.now()<deadline){await replies.flush();await flush();}

@@ -66,10 +66,24 @@ test('Hosted OAuth binds each channel to validated identity and uses persisted s
   const event=await request('/api/twitch/events/101',{method:'POST',headers:{'Content-Type':'application/json','twitch-eventsub-message-id':id,'twitch-eventsub-message-timestamp':timestamp,'twitch-eventsub-message-signature':signature,'twitch-eventsub-message-type':'webhook_callback_verification'},body:raw});
   assert.equal(event.status,200);assert.equal(await event.text(),'verified');
   assert.equal((await repository.getSecret<any>('101','chat-status')).status,'Connected');
+  await repository.mutate('101',s=>{s.questionLanguage='en';});
+  const lease=await repository.acquire('101');
+  const languageResponse=await request('/api/action',{method:'POST',headers:{Cookie:one,Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({type:'question-language',value:'original'})});
+  assert.equal(languageResponse.status,200);assert.equal(await repository.getSecret('101','question-language'),'original');
+  assert.equal((await(await request('/api/state',{headers:{Cookie:one}})).json()).questionLanguage,'original');
+  assert.equal(await repository.getSecret('202','question-language'),undefined);
+  delete lease.state.cloudLease;await repository.commit(lease);
   assert.equal((await request('/api/cron')).status,403);
  }finally{
   await Promise.allSettled(work);server.close();server.closeAllConnections();globalThis.fetch=savedFetch;
   if(oldId===undefined)delete process.env.TWITCH_CLIENT_ID;else process.env.TWITCH_CLIENT_ID=oldId;
   if(oldSecret===undefined)delete process.env.TWITCH_CLIENT_SECRET;else process.env.TWITCH_CLIENT_SECRET=oldSecret;
  }
+});
+
+import {aiFailure} from '../server/ai-status.ts';
+test('AI error status exposes only known failure categories, never provider messages',()=>{
+ assert.match(aiFailure({status:401,message:'private-key'},'Retry queued'),/authentication/);
+ assert.match(aiFailure({status:429,code:'insufficient_quota'},'Retry queued'),/quota exhausted/);
+ assert.equal(aiFailure({status:500,message:'private question and key'},'Retry queued'),'Retry queued');
 });
