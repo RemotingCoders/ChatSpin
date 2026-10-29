@@ -1,6 +1,6 @@
 import type {IncomingMessage,ServerResponse} from 'node:http';
-import {createCloudApp} from '../server/cloud.ts';
-import {SupabaseRepository} from '../server/supabase.ts';
+import {createCloudApp} from '../server/cloud.js';
+import {SupabaseRepository} from '../server/supabase.js';
 let app:ReturnType<typeof createCloudApp>|undefined;
 export default function handler(req:IncomingMessage,res:ServerResponse){
  try{

@@ -1,5 +1,5 @@
-import {seedDemoTranslations} from './demoTranslations.ts';
-import {questionPresentation,type QuestionLanguage,type QuestionTranslation} from './presentation.ts';
+import {seedDemoTranslations} from './demoTranslations.js';
+import {questionPresentation,type QuestionLanguage,type QuestionTranslation} from './presentation.js';
 import { randomInt, randomUUID } from 'node:crypto';
 export type User = {
     id: string;
@@ -119,7 +119,7 @@ export const emptyState = (demo = false): State => ({ liveSession: randomUUID(),
 export const normalize = (text: string) => text.normalize('NFKC').trim().toLocaleLowerCase().replace(/\s+/g, ' ');
 export const momentQuestion = (text: string) => /\b(?:what are you (?:doing|trying|working)|what.*(?:right now|at the moment)|qué (?:estás|estas) (?:haciendo|intentando|construyendo)|en qu[eé] (?:estás|estas) trabajando)\b/iu.test(text);
 export const support = (g: Group) => new Set([...g.questions.map(q => q.user.id), ...g.supporters]).size;
-import { settings } from './limits.ts';
+import { settings } from './limits.js';
 export function addQuestion(s: State, user: User, text: string, messageId?: string, at = Date.now()) {
     const now = at;
     const exact = s.groups.find(g => g.questions.some(q => normalize(q.text) === normalize(text)) && (g.status === 'pending' ? withinWindow(g, now) : answerIsActive(s, g) && (!g.contextual || withinWindow(g, now))));

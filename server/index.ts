@@ -1,34 +1,23 @@
+import './session-types.js';
 import 'dotenv/config';
-import {extensionRouter,extensionPreviewRouter} from '../extension/server/router.ts';
-import { settings, retain, bindBudget } from './limits.ts';
-import {questionPresentation,presentedSpin} from './presentation.ts';
-import {TranslationWork} from './translation.ts';
-import { Repository, PersistentSessions } from './storage.ts';
-import { timedFetch } from './http.ts';
+import {extensionRouter,extensionPreviewRouter} from '../extension/server/router.js';
+import { settings, retain, bindBudget } from './limits.js';
+import {questionPresentation,presentedSpin} from './presentation.js';
+import {TranslationWork} from './translation.js';
+import { Repository, PersistentSessions } from './storage.js';
+import { timedFetch } from './http.js';
 import express from 'express';
 import session from 'express-session';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
-import { addQuestion, demoState, emptyState, merge, split, spin, support, eligibleEntries, type State, type User, rememberAnswer, answerIsActive } from './domain.ts';
-import { QuestionWork } from './work.ts';
-import { groupBatch, detectQuestions } from './ai.ts';
-import { extractChatQuestion } from './chat.ts';
-import { ApprovedReplies } from './replies.ts';
-import { archiveSession, clearCollection } from './reset.ts';
-import { TwitchConnection, type Credentials } from './twitch.ts';
-declare module 'express-session' {
-    interface SessionData {
-        user: User;
-        demo: boolean;
-        demoController: boolean;
-        oauth: {
-            state: string;
-            role: string;
-            at: number;
-        };
-    }
-}
+import { addQuestion, demoState, emptyState, merge, split, spin, support, eligibleEntries, type State, type User, rememberAnswer, answerIsActive } from './domain.js';
+import { QuestionWork } from './work.js';
+import { groupBatch, detectQuestions } from './ai.js';
+import { extractChatQuestion } from './chat.js';
+import { ApprovedReplies } from './replies.js';
+import { archiveSession, clearCollection } from './reset.js';
+import { TwitchConnection, type Credentials } from './twitch.js';
 const origin = process.env.APP_URL || 'http://localhost:3000';
 const production = process.env.NODE_ENV === 'production';
 if (production && (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32 || process.env.SESSION_SECRET === 'replace-with-a-long-random-secret'))

@@ -1,8 +1,8 @@
 import {z} from 'zod';
 import {randomBytes} from 'node:crypto';
-import {addQuestion,merge,split,spin,rememberAnswer,type State,type User} from './domain.ts';
-import {clearCollection} from './reset.ts';
-import {questionPresentation} from './presentation.ts';
+import {addQuestion,merge,split,spin,rememberAnswer,type State,type User} from './domain.js';
+import {clearCollection} from './reset.js';
+import {questionPresentation} from './presentation.js';
 const schema=z.object({type:z.string().max(30),id:z.string().max(100).optional(),target:z.string().max(100).optional(),text:z.string().max(2000).optional(),title:z.string().max(60).optional(),value:z.union([z.boolean(),z.string().max(30)]).optional(),confirmed:z.boolean().optional()}).strict();
 export function cloudDashboardAction(s:State,user:User,body:unknown){
  const action=schema.parse(body),group=s.groups.find(g=>g.id===action.id);

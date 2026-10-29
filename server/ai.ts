@@ -1,8 +1,8 @@
-import { reserveAI, flushBudget } from './limits.ts';
+import { reserveAI, flushBudget } from './limits.js';
 import OpenAI from 'openai';
 import { z } from 'zod';
 import { zodTextFormat } from 'openai/helpers/zod';
-import { type Group, type State, merge, CONTEXT_WINDOW_MS, answerIsActive } from './domain.ts';
+import { type Group, type State, merge, CONTEXT_WINDOW_MS, answerIsActive } from './domain.js';
 const contextSpan = (groups: Group[]) => { const times = groups.flatMap(g => g.questions.map(q => q.at)); return Math.max(...times) - Math.min(...times); };
 const modelGroup = (g: Group) => ({ id: g.id, text: g.text, status: g.status, timeSensitive: !!g.contextual, firstAskedAt: Math.min(...g.questions.map(q => q.at)), lastAskedAt: Math.max(...g.questions.map(q => q.at)) });
 const decisions = z.object({ matches: z.array(z.object({ source: z.string(), target: z.string().nullable(), confidence: z.enum(['equivalent', 'contextual', 'uncertain', 'different']), timeSensitive: z.boolean(), title: z.string().max(60) })) });

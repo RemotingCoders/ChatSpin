@@ -1,4 +1,4 @@
-import type {Group,State,Spin} from './domain.ts';
+import type {Group,State,Spin} from './domain.js';
 export type QuestionLanguage='original'|'en'|'es'|'ru'|'de';
 export type QuestionTranslation={source:string;text:string;title:string};
 export const translationSource=(g:Group)=>JSON.stringify({text:g.text,title:g.customTitle||g.text});

@@ -1,9 +1,9 @@
 import express from 'express';
 import {z} from 'zod';
-import {verifyExtensionJWT,extensionController,linkedViewer,type ExtensionClaims} from './auth.ts';
-import {extensionState,applyExtensionAction,languageSchema,type ExtensionActor} from './service.ts';
-import {SupabaseRepository,StateConflict,ChannelBusy} from '../../server/supabase.ts';
-import type {State,User} from '../../server/domain.ts';
+import {verifyExtensionJWT,extensionController,linkedViewer,type ExtensionClaims} from './auth.js';
+import {extensionState,applyExtensionAction,languageSchema,type ExtensionActor} from './service.js';
+import {SupabaseRepository,StateConflict,ChannelBusy} from '../../server/supabase.js';
+import type {State,User} from '../../server/domain.js';
 
 export type CloudExtensionOptions={repository:SupabaseRepository;clientId:string;secrets:string[];origins?:string[];schedule?:(channel:string)=>void};
 export function cloudExtensionRouter(options:CloudExtensionOptions){

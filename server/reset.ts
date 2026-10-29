@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import type { State } from './domain.ts';
+import type { State } from './domain.js';
 
 export type ClearTarget = 'questions' | 'participants';
 

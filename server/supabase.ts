@@ -1,6 +1,6 @@
 import {createCipheriv,createDecipheriv,createHash,randomBytes} from 'node:crypto';
-import {emptyState,type State} from './domain.ts';
-import {validateState} from './storage.ts';
+import {emptyState,type State} from './domain.js';
+import {validateState} from './storage.js';
 
 export class StateConflict extends Error {constructor(){super('Channel changed. Please try again.');}}
 export type CloudLease={id:string;until:number};

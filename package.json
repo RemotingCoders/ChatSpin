@@ -11,7 +11,8 @@
     "test:ai": "node --import tsx tests/evaluate-ai.ts",
     "restore": "node --import tsx server/restore.ts",
     "extension:build": "tsc --noEmit && vite build --config extension/vite.config.ts",
-    "extension:package": "npm run extension:build && node extension/package.mjs"
+    "extension:package": "npm run extension:build && node extension/package.mjs",
+    "test:deployment": "node scripts/verify-backend.mjs"
   },
   "dependencies": {
     "@vercel/functions": "3.6.1",

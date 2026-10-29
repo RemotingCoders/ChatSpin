@@ -1,9 +1,9 @@
 import OpenAI from 'openai';
 import {z} from 'zod';
 import {zodTextFormat} from 'openai/helpers/zod';
-import type {State} from './domain.ts';
-import {reserveAI,flushBudget} from './limits.ts';
-import {translationSource} from './presentation.ts';
+import type {State} from './domain.js';
+import {reserveAI,flushBudget} from './limits.js';
+import {translationSource} from './presentation.js';
 export type TranslationInput={id:string;source:string;text:string;title:string};
 const schema=z.object({translations:z.array(z.object({id:z.string(),text:z.string().min(1).max(2000),title:z.string().min(1).max(100)}))});
 export async function translateQuestions(items:TranslationInput[],language:'en'|'es'|'ru'|'de',state:State){

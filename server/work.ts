@@ -1,5 +1,5 @@
-import { addQuestion, answerIsActive, normalize, type Group, type State, type User } from './domain.ts';
-import { extractChatQuestion } from './chat.ts';
+import { addQuestion, answerIsActive, normalize, type Group, type State, type User } from './domain.js';
+import { extractChatQuestion } from './chat.js';
 export class QuestionWork {
     private rates = new Map<string, number[]>();
     busy = false;

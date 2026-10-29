@@ -1,5 +1,5 @@
-import type {Group} from './domain.ts';
-import {translationSource} from './presentation.ts';
+import type {Group} from './domain.js';
+import {translationSource} from './presentation.js';
 const samples=[
  {en:['Finding your first community','What would you focus on to grow a small Twitch community?'],es:['Crear tu primera comunidad','¿En qué te enfocarías para hacer crecer una comunidad pequeña en Twitch?'],ru:['Ваше первое сообщество','На чём бы вы сосредоточились, чтобы развить небольшое сообщество на Twitch?'],de:['Die erste Community aufbauen','Worauf würdest du dich konzentrieren, um eine kleine Twitch-Community aufzubauen?']},
  {en:['Your streaming setup','What equipment would you recommend for someone starting out?'],es:['Tu equipo para transmitir','¿Qué equipo recomendarías para alguien que está empezando?'],ru:['Оборудование для стримов','Какое оборудование вы порекомендовали бы начинающему стримеру?'],de:['Deine Streaming-Ausrüstung','Welche Ausrüstung würdest du jemandem empfehlen, der gerade anfängt?']},

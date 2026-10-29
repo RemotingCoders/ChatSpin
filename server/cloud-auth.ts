@@ -1,10 +1,11 @@
+import './session-types.js';
 import express from 'express';
 import session from 'express-session';
 import {randomBytes,timingSafeEqual} from 'node:crypto';
-import {SupabaseRepository} from './supabase.ts';
-import {timedFetch} from './http.ts';
-import {subscribeCloudChat} from './cloud-twitch.ts';
-import type {Credentials} from './twitch.ts';
+import {SupabaseRepository} from './supabase.js';
+import {timedFetch} from './http.js';
+import {subscribeCloudChat} from './cloud-twitch.js';
+import type {Credentials} from './twitch.js';
 class SupabaseSessions extends session.Store {
  constructor(private repository:SupabaseRepository){super();}
  get(id:string,done:(error?:unknown,value?:session.SessionData|null)=>void){void this.repository.getSession<session.SessionData>(id).then(value=>done(null,value||null),done);}

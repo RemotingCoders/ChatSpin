@@ -1,4 +1,4 @@
-import { answerIsActive, type Group, type State, type User } from './domain.ts';
+import { answerIsActive, type Group, type State, type User } from './domain.js';
 type ReplyJob = {
     groupId: string;
     userId: string;

@@ -1,7 +1,7 @@
 import express from 'express';
 import {createHmac,timingSafeEqual} from 'node:crypto';
-import {SupabaseRepository} from './supabase.ts';
-import {timedFetch} from './http.ts';
+import {SupabaseRepository} from './supabase.js';
+import {timedFetch} from './http.js';
 export const webhookSecret=(secret:string,channel:string)=>createHmac('sha256',secret).update('chatspin.eventsub:'+channel).digest('hex');
 export function verifyWebhook(raw:Buffer,headers:Record<string,string|undefined>,secret:string,now=Date.now()){
  const id=headers['twitch-eventsub-message-id'],timestamp=headers['twitch-eventsub-message-timestamp'],supplied=headers['twitch-eventsub-message-signature'];

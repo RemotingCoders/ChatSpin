@@ -1,6 +1,6 @@
 import {z} from 'zod';
-import {addQuestion,answerIsActive,eligibleEntries,rememberAnswer,spin,support,type State,type User} from '../../server/domain.ts';
-import {questionPresentation,type QuestionLanguage} from '../../server/presentation.ts';
+import {addQuestion,answerIsActive,eligibleEntries,rememberAnswer,spin,support,type State,type User} from '../../server/domain.js';
+import {questionPresentation,type QuestionLanguage} from '../../server/presentation.js';
 export const languages=['original','en','es','ru','de'] as const;
 export const languageSchema=z.enum(languages);
 export type ExtensionActor={user?:User;controller:boolean;anonymous:boolean};

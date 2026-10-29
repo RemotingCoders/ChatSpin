@@ -1,4 +1,4 @@
-import type { State } from './domain.ts';
+import type { State } from './domain.js';
 export const defaults = { aiCallLimit: 200, aiTokenLimit: 200000, retentionDays: 30, maxGroups: 2000 };
 export function settings(s: State) { return { ...defaults, ...s.settings }; }
 const budgetFlushers = new WeakMap<State, () => Promise<void>>();

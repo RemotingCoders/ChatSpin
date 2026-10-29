@@ -1,8 +1,8 @@
 import express from 'express';
 import {z} from 'zod';
-import type {State,User} from '../../server/domain.ts';
-import {verifyExtensionJWT,extensionController,linkedViewer} from './auth.ts';
-import {applyExtensionAction,extensionState,languageSchema,type ExtensionActor} from './service.ts';
+import type {State,User} from '../../server/domain.js';
+import {verifyExtensionJWT,extensionController,linkedViewer} from './auth.js';
+import {applyExtensionAction,extensionState,languageSchema,type ExtensionActor} from './service.js';
 export type ExtensionDependencies={state:()=>State;persist:()=>void;enqueue:(id:string)=>void;busy:()=>boolean;demand:(language:'en'|'es'|'ru'|'de')=>void;clientId:string;secrets:string[];channel:string;origins:string[];moderators:string[]};
 const actorUser=(s:State,id:string):User=>s.groups.flatMap(g=>g.questions).find(q=>q.user.id===id)?.user||s.participants.find(p=>p.id===id)||{id,name:'Twitch viewer'};
 export function extensionRouter(deps:ExtensionDependencies){

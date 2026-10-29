@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
-import type { User } from './domain.ts';
-import { timedFetch } from './http.ts';
+import type { User } from './domain.js';
+import { timedFetch } from './http.js';
 export type Credentials = {
     access_token: string;
     refresh_token: string;

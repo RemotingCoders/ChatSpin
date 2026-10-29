@@ -1,13 +1,13 @@
-import {SupabaseRepository,ChannelBusy,StateConflict} from './supabase.ts';
-import {bindBudget,retain} from './limits.ts';
-import {QuestionWork} from './work.ts';
-import {groupBatch,detectQuestions} from './ai.ts';
-import {TranslationWork} from './translation.ts';
+import {SupabaseRepository,ChannelBusy,StateConflict} from './supabase.js';
+import {bindBudget,retain} from './limits.js';
+import {QuestionWork} from './work.js';
+import {groupBatch,detectQuestions} from './ai.js';
+import {TranslationWork} from './translation.js';
 import {z} from 'zod';
-import {translationSource} from './presentation.ts';
-import {extractChatQuestion} from './chat.ts';
-import {ApprovedReplies} from './replies.ts';
-import {TwitchConnection,type Credentials} from './twitch.ts';
+import {translationSource} from './presentation.js';
+import {extractChatQuestion} from './chat.js';
+import {ApprovedReplies} from './replies.js';
+import {TwitchConnection,type Credentials} from './twitch.js';
 
 export async function processCloudChannel(repository:SupabaseRepository,channel:string){
  const initial=await repository.load(channel),pendingInbox=await repository.inbox(channel),now=Date.now();

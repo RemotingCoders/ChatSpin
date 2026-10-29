@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import session from 'express-session';
 import { z } from 'zod';
-import { emptyState, type State } from './domain.ts';
+import { emptyState, type State } from './domain.js';
 const user = z.object({ id: z.string(), name: z.string(), login: z.string().optional() });
 const question = z.object({ id: z.string(), user, text: z.string(), at: z.number().finite(), messageId: z.string().optional() });
 const translation=z.object({source:z.string(),text:z.string(),title:z.string()});

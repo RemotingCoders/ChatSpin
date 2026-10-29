@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { Repository, validateState } from './storage.ts';
+import { Repository, validateState } from './storage.js';
 if (!process.argv[2])
     throw new Error('Supply the path to a session backup. Stop ChatSpin first.');
 const restored = validateState(JSON.parse(readFileSync(resolve(process.argv[2]), 'utf8')));

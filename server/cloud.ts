@@ -2,15 +2,15 @@ import express from 'express';
 import {createHmac,randomBytes,timingSafeEqual} from 'node:crypto';
 import {waitUntil} from '@vercel/functions';
 import {z} from 'zod';
-import {SupabaseRepository,StateConflict,ChannelBusy,type CloudState} from './supabase.ts';
-import {cloudExtensionRouter} from '../extension/server/cloud.ts';
-import {cloudAuthentication} from './cloud-auth.ts';
-import {cloudDashboardAction} from './cloud-actions.ts';
-import {cloudWebhooks} from './cloud-twitch.ts';
-import {processCloudChannel} from './cloud-work.ts';
-import {questionPresentation,presentedSpin} from './presentation.ts';
-import {answerIsActive,eligibleEntries,support} from './domain.ts';
-import {settings} from './limits.ts';
+import {SupabaseRepository,StateConflict,ChannelBusy,type CloudState} from './supabase.js';
+import {cloudExtensionRouter} from '../extension/server/cloud.js';
+import {cloudAuthentication} from './cloud-auth.js';
+import {cloudDashboardAction} from './cloud-actions.js';
+import {cloudWebhooks} from './cloud-twitch.js';
+import {processCloudChannel} from './cloud-work.js';
+import {questionPresentation,presentedSpin} from './presentation.js';
+import {answerIsActive,eligibleEntries,support} from './domain.js';
+import {settings} from './limits.js';
 
 export function createCloudApp(repository:SupabaseRepository,origin:string,secret:string,background:(promise:Promise<unknown>)=>void=waitUntil){
  const app=express();app.disable('x-powered-by');app.set('trust proxy',1);
