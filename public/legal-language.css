@@ -1,0 +1,8 @@
+html[data-legal-language="es"] section[lang="en"],html[data-legal-language="en"] section[lang="es"],[hidden]{display:none!important}
+.legal-language-picker{display:none;align-items:center;gap:8px;flex-wrap:wrap;margin:20px 0}
+.legal-js .legal-language-picker{display:flex}
+.legal-language-label{font-size:14px;color:#bdb4cc;margin-right:4px}
+.legal-language-picker button{font:inherit;font-size:14px;padding:7px 16px;border:1px solid #514164;border-radius:8px;background:#1c1729;color:#eeeaf5;cursor:pointer;min-height:44px}
+.legal-language-picker button[aria-pressed="true"]{background:#a17af1;color:#191026;border-color:#a17af1;font-weight:600}
+.legal-language-picker button:focus-visible,a:focus-visible{outline:2px solid #81e4c5;outline-offset:3px}
+@media(max-width:550px){h1{font-size:29px}main{padding:28px 20px}nav{gap:16px}}
