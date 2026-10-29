@@ -160,8 +160,7 @@ function App() {
       <div className="main-shell">
         <header>
           <div className="breadcrumb">
-            {t('Workspace ')}
-            <span>/</span> <b>{viewer ? t('Viewer space') : t('Live dashboard')}</b>
+            <b>{viewer ? t('Viewer space') : t('Streamer dashboard')}</b>
           </div>
           <div className="header-actions">
             <LanguagePicker act={act} controller={!!session?.controller && !viewer} />
