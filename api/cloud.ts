@@ -14,5 +14,5 @@ export default function handler(req:IncomingMessage,res:ServerResponse){
   const route=url.searchParams.get('__chatspin_route');
   if(route){if(!/^\/(api|auth|extension-api)(\/|$)/.test(route)){res.statusCode=400;res.end();return;}url.searchParams.delete('__chatspin_route');req.url=route+(url.searchParams.size?'?'+url.searchParams.toString():'');}
   app(req,res);
- }catch{res.statusCode=503;res.setHeader('Content-Type','application/json');res.end(JSON.stringify({error:'ChatSpin backend is not configured. Check server environment variables.'}));}
+ }catch(error){const message=error instanceof Error?error.message:'';const safe=['Invalid APP_URL','Invalid URL','SUPABASE_URL must be an HTTPS project origin.','SUPABASE_SECRET_KEY is missing.','SESSION_SECRET must be a random production secret of at least 32 characters.'].includes(message)?message:'ChatSpin backend is not configured. Check server environment variables.';res.statusCode=503;res.setHeader('Content-Type','application/json');res.end(JSON.stringify({error:safe}));}
 }

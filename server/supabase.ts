@@ -13,7 +13,8 @@ export class SupabaseRepository {
  constructor(url:string,private secret:string,sessionSecret:string,private request:typeof fetch=fetch){
   const parsed=new URL(url);
   if(parsed.protocol!=='https:'||parsed.username||parsed.password||parsed.search||parsed.hash||parsed.pathname!=='/')throw Error('SUPABASE_URL must be an HTTPS project origin.');
-  if(!secret||sessionSecret.length<32||sessionSecret==='replace-with-a-long-random-secret')throw Error('Configure SUPABASE_SECRET_KEY and a strong SESSION_SECRET.');
+  if(!secret)throw Error('SUPABASE_SECRET_KEY is missing.');
+  if(sessionSecret.length<32||sessionSecret==='replace-with-a-long-random-secret')throw Error('SESSION_SECRET must be a random production secret of at least 32 characters.');
   this.origin=parsed.origin;this.key=createHash('sha256').update(sessionSecret).digest();
  }
  private channel(value:string){if(!/^\d{1,30}$/.test(value))throw Error('Invalid Twitch channel.');return value;}
