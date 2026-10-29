@@ -17,13 +17,13 @@ send a provider request. Existing questions remain available for retry/review.
 
 Server-only environment variables, never `VITE_`:
 
-| Variable | Default | Meaning |
-| --- | ---: | --- |
-| `CHATSPIN_AI_DAILY_CHANNEL_CALLS` | 200 | Maximum reservations per channel and UTC day |
-| `CHATSPIN_AI_DAILY_CHANNEL_TOKENS` | 200000 | Maximum estimated tokens per channel and UTC day |
-| `CHATSPIN_AI_DAILY_GLOBAL_CALLS` | 2000 | Shared maximum for the whole hosted deployment |
-| `CHATSPIN_AI_DAILY_GLOBAL_TOKENS` | 2000000 | Shared estimated-token maximum |
-| `CHATSPIN_REQUIRE_ENTITLEMENT` | false | When true, channels need an enabled operator-created entitlement row |
+| Variable                           | Default | Meaning                                                              |
+| ---------------------------------- | ------: | -------------------------------------------------------------------- |
+| `CHATSPIN_AI_DAILY_CHANNEL_CALLS`  |     200 | Maximum reservations per channel and UTC day                         |
+| `CHATSPIN_AI_DAILY_CHANNEL_TOKENS` |  200000 | Maximum estimated tokens per channel and UTC day                     |
+| `CHATSPIN_AI_DAILY_GLOBAL_CALLS`   |    2000 | Shared maximum for the whole hosted deployment                       |
+| `CHATSPIN_AI_DAILY_GLOBAL_TOKENS`  | 2000000 | Shared estimated-token maximum                                       |
+| `CHATSPIN_REQUIRE_ENTITLEMENT`     |   false | When true, channels need an enabled operator-created entitlement row |
 
 Zero disables the corresponding allowance. Invalid numeric values fail closed.
 The database reserves a call and estimated tokens atomically against both channel

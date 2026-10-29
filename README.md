@@ -29,20 +29,20 @@ npm start
 
 Set variables in `.env`; never commit it.
 
-| Variable | Purpose |
-| --- | --- |
-| `PORT` | Local listener, default `3000` |
-| `APP_URL` | Exact browser origin, default `http://localhost:3000`; used for OAuth redirects and same-origin writes |
-| `SESSION_SECRET` | Long random session signing secret; required in production |
-| `TWITCH_CLIENT_ID` | Registered Twitch application's client ID |
-| `TWITCH_CLIENT_SECRET` | Twitch server-side OAuth secret |
-| `TWITCH_BROADCASTER_ID` | Stable numeric Twitch ID of the channel owner |
-| `MODERATOR_IDS` | Optional comma-separated stable Twitch IDs explicitly authorized by the operator |
-| `OPENAI_API_KEY` | Optional server-only API key for semantic grouping |
-| `OPENAI_MODEL` | Default `gpt-4.1-mini`; configurable based on account availability |
-| `ENABLE_DEMO` | Set `false` to disable local demo; always disabled in production |
-| `DATA_FILE` | Legacy import/backup path, default `./data/state.json`; live storage uses the adjacent `.sqlite` database |
-| `OPENAI_EMBEDDING_MODEL` | Semantic candidate index, default `text-embedding-3-small` |
+| Variable                 | Purpose                                                                                                   |
+| ------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `PORT`                   | Local listener, default `3000`                                                                            |
+| `APP_URL`                | Exact browser origin, default `http://localhost:3000`; used for OAuth redirects and same-origin writes    |
+| `SESSION_SECRET`         | Long random session signing secret; required in production                                                |
+| `TWITCH_CLIENT_ID`       | Registered Twitch application's client ID                                                                 |
+| `TWITCH_CLIENT_SECRET`   | Twitch server-side OAuth secret                                                                           |
+| `TWITCH_BROADCASTER_ID`  | Stable numeric Twitch ID of the channel owner                                                             |
+| `MODERATOR_IDS`          | Optional comma-separated stable Twitch IDs explicitly authorized by the operator                          |
+| `OPENAI_API_KEY`         | Optional server-only API key for semantic grouping                                                        |
+| `OPENAI_MODEL`           | Default `gpt-4.1-mini`; configurable based on account availability                                        |
+| `ENABLE_DEMO`            | Set `false` to disable local demo; always disabled in production                                          |
+| `DATA_FILE`              | Legacy import/backup path, default `./data/state.json`; live storage uses the adjacent `.sqlite` database |
+| `OPENAI_EMBEDDING_MODEL` | Semantic candidate index, default `text-embedding-3-small`                                                |
 
 Changing `PORT` also requires changing `APP_URL`. Set `APP_URL` to the exact HTTPS public origin when using a reverse proxy. Set `TRUST_PROXY_HOPS=1` only when exactly one trusted reverse proxy terminates HTTPS; the default is `0` (no trusted proxy). Production requires a random signing/encryption secret of at least 32 characters.
 
@@ -170,3 +170,9 @@ The hosted service hides AI budget editors and rejects budget changes through th
 Cloud owners can delegate extension controls to explicitly listed Twitch moderators, review processing failures, manually approve questions, preview channel backups and restore them with confirmation. Restore preserves current moderator delegation and never replays old public replies. Local installation settings remain available.
 
 See [rollout and live acceptance checklist](docs/stabilization-verification.md) for deployment order and the real Twitch checks that automated tests do not replace.
+
+## Code style and readability
+
+Run `npm run format` before committing and `npm run format:check` to verify formatting. Prettier formats the maintained TypeScript, TSX, JavaScript, CSS, HTML, JSON and Markdown with two-space indentation and a 100-column target. Generated bundles, local data, credentials and demo media are excluded.
+
+The dashboard uses a minimum CSS text size of 13 px, 14 px controls and 15 px question titles. Muted text has been brightened for the dark surfaces. The extension uses at least 12 px CSS text. Layouts were checked at 1920×1080, 1280×800 and 390×844; contrast checks cover the demo text and wheel palette, not a full accessibility certification.

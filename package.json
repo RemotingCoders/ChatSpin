@@ -12,7 +12,9 @@
     "restore": "node --import tsx server/restore.ts",
     "extension:build": "tsc --noEmit && vite build --config extension/vite.config.ts",
     "extension:package": "npm run extension:build && node extension/package.mjs",
-    "test:deployment": "node scripts/verify-backend.mjs"
+    "test:deployment": "node scripts/verify-backend.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@vercel/functions": "3.6.1",
@@ -32,6 +34,7 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@types/ws": "^8.18.1",
+    "prettier": "3.9.10",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",
     "vite": "^7.1.12"

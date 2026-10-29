@@ -2,25 +2,25 @@
 
 All priorities from the code review were implemented in this change. No live state or credentials were used in isolated server/browser tests.
 
-| Priority | Review item | Implementation |
-| --- | --- | --- |
-| P1 | Timing bypasses | Exact and model-equivalent open-group matches share the five-minute guard; temporary-question metadata applies it to saved-answer reuse too. |
-| P1 | Answer loss on merge | Existing answers transfer to pending destinations; conflicts require an explicit choice; previous versions are preserved. |
-| P1 | Failed/lost AI work | Persisted detection inbox and grouping jobs, bounded backoff, restart recovery, manual reprocessing. |
-| P1 | Arrivals during AI | Per-message tracking is resolved against the resulting groups after the asynchronous call. |
-| P1 | Indirect questions | Structured semantic detection supplements the immediate local question/command path. |
-| P2 | Stale answers | Session-only default, permanent opt-in, explicit new live session, old answers kept for review. |
-| P2 | OBS link rotation | Persisted encrypted token; explicit regeneration with confirmation. |
-| P2 | Unbounded HTTP waits | Twitch HTTP timeout and single-flight token refresh. |
-| P2 | Twitch recovery | Per-socket watchdogs, bounded handshake, migration cleanup, credential revalidation. |
-| P2 | Candidate retrieval | Cached multilingual vectors rank more than 30 eligible candidates. |
-| P2 | Reply visibility/control | Pause/resume, bounded persisted logs/jobs, cancelled/failed/partial/unknown outcomes. |
-| P2 | Storage robustness | Validated legacy import, SQLite WAL transactions, snapshots, backup recovery, restore CLI, single-process lease. |
-| P2 | Consumption/retention | Configurable hard call/token ceilings, per-viewer intake limits, group cap, archived hourly retention. |
-| P2 | Hosting sessions/tokens | Persistent encrypted sessions and OAuth credentials; same secret/data directory required across restart. |
-| P3 | Polling races | Serialized loader, forced post-action reload, request timeouts. |
-| P3 | Docs/tests | Updated walkthrough, public-answer demo, migration/recovery instructions, expanded regression and live semantic evaluations. |
-| P3 | Frontend maintainability | Separate dashboard, OBS, review, operations, types, API, and workspace hook. |
+| Priority | Review item              | Implementation                                                                                                                               |
+| -------- | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1       | Timing bypasses          | Exact and model-equivalent open-group matches share the five-minute guard; temporary-question metadata applies it to saved-answer reuse too. |
+| P1       | Answer loss on merge     | Existing answers transfer to pending destinations; conflicts require an explicit choice; previous versions are preserved.                    |
+| P1       | Failed/lost AI work      | Persisted detection inbox and grouping jobs, bounded backoff, restart recovery, manual reprocessing.                                         |
+| P1       | Arrivals during AI       | Per-message tracking is resolved against the resulting groups after the asynchronous call.                                                   |
+| P1       | Indirect questions       | Structured semantic detection supplements the immediate local question/command path.                                                         |
+| P2       | Stale answers            | Session-only default, permanent opt-in, explicit new live session, old answers kept for review.                                              |
+| P2       | OBS link rotation        | Persisted encrypted token; explicit regeneration with confirmation.                                                                          |
+| P2       | Unbounded HTTP waits     | Twitch HTTP timeout and single-flight token refresh.                                                                                         |
+| P2       | Twitch recovery          | Per-socket watchdogs, bounded handshake, migration cleanup, credential revalidation.                                                         |
+| P2       | Candidate retrieval      | Cached multilingual vectors rank more than 30 eligible candidates.                                                                           |
+| P2       | Reply visibility/control | Pause/resume, bounded persisted logs/jobs, cancelled/failed/partial/unknown outcomes.                                                        |
+| P2       | Storage robustness       | Validated legacy import, SQLite WAL transactions, snapshots, backup recovery, restore CLI, single-process lease.                             |
+| P2       | Consumption/retention    | Configurable hard call/token ceilings, per-viewer intake limits, group cap, archived hourly retention.                                       |
+| P2       | Hosting sessions/tokens  | Persistent encrypted sessions and OAuth credentials; same secret/data directory required across restart.                                     |
+| P3       | Polling races            | Serialized loader, forced post-action reload, request timeouts.                                                                              |
+| P3       | Docs/tests               | Updated walkthrough, public-answer demo, migration/recovery instructions, expanded regression and live semantic evaluations.                 |
+| P3       | Frontend maintainability | Separate dashboard, OBS, review, operations, types, API, and workspace hook.                                                                 |
 
 ## Operating choices
 

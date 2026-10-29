@@ -42,7 +42,6 @@ Automatic Twitch replies detect the language of the incoming question and transl
 
 Live check: approve an English answer, repeat the question in Spanish from another account, and verify a Spanish public reply mentioning that account. Switch a viewer to German and then Original: only that viewer’s answer display changes, while the saved approved source remains English.
 
-
 ## Demo regression fixes (2026-10-29)
 
 - Public replies bypass translation when OpenAI is not configured. With AI, language detection and answer translation share one request; repeated text/language pairs reuse the cache. Manual merging preserves the viewer question text.

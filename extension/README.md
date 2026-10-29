@@ -6,13 +6,13 @@ Optional frontend and JWT-authenticated API. The existing local dashboard and OB
 
 Register an Extension separately from the existing OAuth application. Enable Panel, Video Fullscreen and Mobile. Version 0.1.0 is a development version, not a public release. In Asset Hosting set:
 
-| Field | File |
-|---|---|
-| Panel Viewer Path | `viewer.html` |
-| Mobile Viewer Path | `mobile.html` |
+| Field                        | File           |
+| ---------------------------- | -------------- |
+| Panel Viewer Path            | `viewer.html`  |
+| Mobile Viewer Path           | `mobile.html`  |
 | Video Fullscreen Viewer Path | `overlay.html` |
-| Configuration Path | `config.html` |
-| Live Configuration Path | `live.html` |
+| Configuration Path           | `config.html`  |
+| Live Configuration Path      | `live.html`    |
 
 The Twitch defaults `panel.html` and `video_overlay.html` are **not** our filenames. Configure the backend origin in the extension's fetch/connect domain allowlist. Production origin: `https://chatspin.taplinko.store`. The backend allows the extension's exact Twitch CDN origin; add only trusted local test HTTPS origins to `EXTENSION_ALLOWED_ORIGINS` if needed. Never allow arbitrary origins.
 

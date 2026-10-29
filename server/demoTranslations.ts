@@ -1,11 +1,69 @@
-import type {Group} from './domain.js';
-import {translationSource} from './presentation.js';
-const samples=[
- {en:['Finding your first community','What would you focus on to grow a small Twitch community?'],es:['Crear tu primera comunidad','¿En qué te enfocarías para hacer crecer una comunidad pequeña en Twitch?'],ru:['Ваше первое сообщество','На чём бы вы сосредоточились, чтобы развить небольшое сообщество на Twitch?'],de:['Die erste Community aufbauen','Worauf würdest du dich konzentrieren, um eine kleine Twitch-Community aufzubauen?']},
- {en:['Your streaming setup','What equipment would you recommend for someone starting out?'],es:['Tu equipo para transmitir','¿Qué equipo recomendarías para alguien que está empezando?'],ru:['Оборудование для стримов','Какое оборудование вы порекомендовали бы начинающему стримеру?'],de:['Deine Streaming-Ausrüstung','Welche Ausrüstung würdest du jemandem empfehlen, der gerade anfängt?']},
- {en:['Avoiding creator burnout','How do you keep streaming without burning out?'],es:['Evitar el agotamiento','¿Cómo seguís transmitiendo sin agotarte?'],ru:['Как избежать выгорания','Как продолжать стримить и не выгореть?'],de:['Burnout vermeiden','Wie schaffst du es, weiterzustreamen, ohne auszubrennen?']},
- {en:['The next chapter','What is one thing you want to try on stream this year?'],es:['Lo que viene','¿Qué te gustaría probar en tus directos este año?'],ru:['Что дальше','Что нового вы хотите попробовать на стримах в этом году?'],de:['Das nächste Kapitel','Was möchtest du dieses Jahr in einem Stream ausprobieren?']},
- {en:['A little advice','What advice would you give yourself five years ago?'],es:['Un consejo','¿Qué consejo le darías a tu yo de hace cinco años?'],ru:['Небольшой совет','Какой совет вы дали бы себе пять лет назад?'],de:['Ein kleiner Rat','Welchen Rat würdest du deinem Ich von vor fünf Jahren geben?']},
- {en:['Behind the scenes','How do you plan a stream before going live?'],es:['Detrás de escena','¿Cómo planificás un directo antes de salir en vivo?'],ru:['За кулисами','Как вы планируете стрим перед выходом в эфир?'],de:['Hinter den Kulissen','Wie planst du einen Stream, bevor du live gehst?']}
+import type { Group } from './domain.js';
+import { translationSource } from './presentation.js';
+const samples = [
+  {
+    en: [
+      'Finding your first community',
+      'What would you focus on to grow a small Twitch community?',
+    ],
+    es: [
+      'Crear tu primera comunidad',
+      '¿En qué te enfocarías para hacer crecer una comunidad pequeña en Twitch?',
+    ],
+    ru: [
+      'Ваше первое сообщество',
+      'На чём бы вы сосредоточились, чтобы развить небольшое сообщество на Twitch?',
+    ],
+    de: [
+      'Die erste Community aufbauen',
+      'Worauf würdest du dich konzentrieren, um eine kleine Twitch-Community aufzubauen?',
+    ],
+  },
+  {
+    en: ['Your streaming setup', 'What equipment would you recommend for someone starting out?'],
+    es: ['Tu equipo para transmitir', '¿Qué equipo recomendarías para alguien que está empezando?'],
+    ru: [
+      'Оборудование для стримов',
+      'Какое оборудование вы порекомендовали бы начинающему стримеру?',
+    ],
+    de: [
+      'Deine Streaming-Ausrüstung',
+      'Welche Ausrüstung würdest du jemandem empfehlen, der gerade anfängt?',
+    ],
+  },
+  {
+    en: ['Avoiding creator burnout', 'How do you keep streaming without burning out?'],
+    es: ['Evitar el agotamiento', '¿Cómo seguís transmitiendo sin agotarte?'],
+    ru: ['Как избежать выгорания', 'Как продолжать стримить и не выгореть?'],
+    de: ['Burnout vermeiden', 'Wie schaffst du es, weiterzustreamen, ohne auszubrennen?'],
+  },
+  {
+    en: ['The next chapter', 'What is one thing you want to try on stream this year?'],
+    es: ['Lo que viene', '¿Qué te gustaría probar en tus directos este año?'],
+    ru: ['Что дальше', 'Что нового вы хотите попробовать на стримах в этом году?'],
+    de: ['Das nächste Kapitel', 'Was möchtest du dieses Jahr in einem Stream ausprobieren?'],
+  },
+  {
+    en: ['A little advice', 'What advice would you give yourself five years ago?'],
+    es: ['Un consejo', '¿Qué consejo le darías a tu yo de hace cinco años?'],
+    ru: ['Небольшой совет', 'Какой совет вы дали бы себе пять лет назад?'],
+    de: ['Ein kleiner Rat', 'Welchen Rat würdest du deinem Ich von vor fünf Jahren geben?'],
+  },
+  {
+    en: ['Behind the scenes', 'How do you plan a stream before going live?'],
+    es: ['Detrás de escena', '¿Cómo planificás un directo antes de salir en vivo?'],
+    ru: ['За кулисами', 'Как вы планируете стрим перед выходом в эфир?'],
+    de: ['Hinter den Kulissen', 'Wie planst du einen Stream, bevor du live gehst?'],
+  },
 ];
-export function seedDemoTranslations(groups:Group[]){groups.forEach((g,index)=>{const sample=samples[index];if(!sample)return;g.translations={};for(const language of ['en','es','ru','de'] as const){const [title,text]=sample[language];g.translations[language]={source:translationSource(g),title,text};}});}
+export function seedDemoTranslations(groups: Group[]) {
+  groups.forEach((g, index) => {
+    const sample = samples[index];
+    if (!sample) return;
+    g.translations = {};
+    for (const language of ['en', 'es', 'ru', 'de'] as const) {
+      const [title, text] = sample[language];
+      g.translations[language] = { source: translationSource(g), title, text };
+    }
+  });
+}

@@ -12,17 +12,17 @@ Each update uses an atomic revision check. Workers acquire a durable, expiring p
 
 ## Production variables (Vercel, server-only)
 
-| Variable | Purpose |
-|---|---|
-| `APP_URL` | `https://chatspin.taplinko.store` |
-| `SUPABASE_URL` | HTTPS project origin, without `/rest/v1` |
-| `SUPABASE_SECRET_KEY` | Supabase server Secret key |
-| `SESSION_SECRET` | Stable random secret, at least 32 characters |
-| `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET` | Shared ChatSpin OAuth application |
-| `EXTENSION_CLIENT_ID`, `EXTENSION_SECRET` | Shared Twitch Extension registration and Base64 shared key |
-| `OPENAI_API_KEY` | Server-side API key for AI; optional for explicit/local matching only |
-| `CRON_SECRET` | Random secret (at least 32 characters) for Vercel's automatic cron Authorization header |
-| `ENABLE_DEMO` | `false` (hosted backend never exposes demo endpoints) |
+| Variable                                   | Purpose                                                                                 |
+| ------------------------------------------ | --------------------------------------------------------------------------------------- |
+| `APP_URL`                                  | `https://chatspin.taplinko.store`                                                       |
+| `SUPABASE_URL`                             | HTTPS project origin, without `/rest/v1`                                                |
+| `SUPABASE_SECRET_KEY`                      | Supabase server Secret key                                                              |
+| `SESSION_SECRET`                           | Stable random secret, at least 32 characters                                            |
+| `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET` | Shared ChatSpin OAuth application                                                       |
+| `EXTENSION_CLIENT_ID`, `EXTENSION_SECRET`  | Shared Twitch Extension registration and Base64 shared key                              |
+| `OPENAI_API_KEY`                           | Server-side API key for AI; optional for explicit/local matching only                   |
+| `CRON_SECRET`                              | Random secret (at least 32 characters) for Vercel's automatic cron Authorization header |
+| `ENABLE_DEMO`                              | `false` (hosted backend never exposes demo endpoints)                                   |
 
 Optional: `OPENAI_MODEL`, `OPENAI_EMBEDDING_MODEL`, `EXTENSION_PREVIOUS_SECRET`, `EXTENSION_ALLOWED_ORIGINS`. Do **not** set a global `TWITCH_BROADCASTER_ID` or `MODERATOR_IDS` for the hosted service. The owner connects their own Twitch account. `PORT`, `DATA_FILE` and `TRUST_PROXY_HOPS` belong to local operation, not this hosted entry point.
 

@@ -5,94 +5,237 @@ import { mkdtempSync, rmSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 test('HTTP authorization, privacy, origin protection, duplicate support, and OBS snapshot', async () => {
-  const port = 14500 + Math.floor(Math.random()*1000), origin = `http://localhost:${port}`;
-  const dir = mkdtempSync(join(tmpdir(),'chatspin-test-'));
-  const child = spawn(process.execPath,['--import','tsx','server/index.ts'], { env: { ...process.env, PORT: String(port), APP_URL: origin, DATA_FILE: join(dir,'state.json'), ENABLE_DEMO:'true', NODE_ENV:'test', OPENAI_API_KEY:'', TWITCH_CLIENT_ID:'', TWITCH_CLIENT_SECRET:'' }, stdio:['ignore','pipe','pipe'] });
+  const port = 14500 + Math.floor(Math.random() * 1000),
+    origin = `http://localhost:${port}`;
+  const dir = mkdtempSync(join(tmpdir(), 'chatspin-test-'));
+  const child = spawn(process.execPath, ['--import', 'tsx', 'server/index.ts'], {
+    env: {
+      ...process.env,
+      PORT: String(port),
+      APP_URL: origin,
+      DATA_FILE: join(dir, 'state.json'),
+      ENABLE_DEMO: 'true',
+      NODE_ENV: 'test',
+      OPENAI_API_KEY: '',
+      TWITCH_CLIENT_ID: '',
+      TWITCH_CLIENT_SECRET: '',
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
   try {
-    await new Promise<void>((resolve,reject) => {
-      const timeout = setTimeout(()=>reject(new Error('Test server did not start')),15000);
-      child.stdout.on('data', data=>{ if(String(data).includes('ChatSpin is running')) {clearTimeout(timeout);resolve();} });
-      child.on('exit',code=>{clearTimeout(timeout);reject(new Error(`Test server exited: ${code}`));});
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('Test server did not start')), 15000);
+      child.stdout.on('data', (data) => {
+        if (String(data).includes('ChatSpin is running')) {
+          clearTimeout(timeout);
+          resolve();
+        }
+      });
+      child.on('exit', (code) => {
+        clearTimeout(timeout);
+        reject(new Error(`Test server exited: ${code}`));
+      });
     });
     async function call(path: string, cookie = '', body?: unknown, source = origin) {
-      return fetch(origin+path,{headers:{cookie,Origin:source,...(body ? {'Content-Type':'application/json'} : {})},method:body?'POST':'GET',body:body?JSON.stringify(body):undefined});
+      return fetch(origin + path, {
+        headers: {
+          cookie,
+          Origin: source,
+          ...(body ? { 'Content-Type': 'application/json' } : {}),
+        },
+        method: body ? 'POST' : 'GET',
+        body: body ? JSON.stringify(body) : undefined,
+      });
     }
-    assert.equal((await call('/api/state')).status,401);
-    assert.equal((await call('/api/demo','',{},'https://untrusted.example')).status,403);
-    assert.equal((await call('/api/overlay?token=wrong')).status,403);
-    const signIn = async (role: string) => { const r=await call('/api/demo','',{role}); assert.equal(r.status,200); return r.headers.get('set-cookie')!.split(';')[0]; };
-    const admin = await signIn('streamer'), alice = await signIn('viewer'), bob = await signIn('viewer');
-    assert.equal((await (await call('/api/session',alice)).json()).controller,false);
-    const initialState=await (await call('/api/state',admin)).json();
-    const initialOverlayUrl=new URL(initialState.obsUrl);
-    const overlayPath=initialOverlayUrl.pathname.replace('/obs','/api/overlay')+initialOverlayUrl.search;
-    const initialOverlay=await (await call(overlayPath)).json();
-    assert.equal(initialOverlay.spin,null); assert.deepEqual(initialOverlay.entries,initialState.entries); assert.ok(initialOverlay.entries.length>0);
-    assert.equal(initialOverlay.groups,undefined); assert.equal(initialOverlay.participants,undefined);
-    assert.equal((await call('/api/action',admin,{type:'question-language',value:'es'})).status,200);
-    assert.equal((await call('/api/action',admin,{type:'ui-language',value:'ru'})).status,200);
-    const localized=await (await call('/api/state',admin)).json();const localizedOBS=await (await call(initialOverlayUrl.pathname.replace('/obs','/api/overlay')+initialOverlayUrl.search)).json();
-    assert.equal(localized.groups[0].text,'¿En qué te enfocarías para hacer crecer una comunidad pequeña en Twitch?');
-    assert.equal(localized.groups[0].questions[0].text,initialState.groups[0].questions[0].text);
-    assert.equal((await call('/api/action',admin,{type:'edit',id:localized.groups[0].id,title:'Mi comunidad',value:'es'})).status,200);
-    const editedLanguage=await (await call('/api/state',admin)).json();assert.equal(editedLanguage.groups[0].title,'Mi comunidad');assert.equal(editedLanguage.groups[0].questions[0].text,initialState.groups[0].questions[0].text);
-    assert.equal(localizedOBS.uiLanguage,'ru');assert.deepEqual(localizedOBS.entries,localized.entries);
-    assert.equal((await call('/api/action',admin,{type:'question-language',value:'fr'})).status,400);
-    await call('/api/action',admin,{type:'question-language',value:'original'});await call('/api/action',admin,{type:'ui-language',value:'en'});
+    assert.equal((await call('/api/state')).status, 401);
+    assert.equal((await call('/api/demo', '', {}, 'https://untrusted.example')).status, 403);
+    assert.equal((await call('/api/overlay?token=wrong')).status, 403);
+    const signIn = async (role: string) => {
+      const r = await call('/api/demo', '', { role });
+      assert.equal(r.status, 200);
+      return r.headers.get('set-cookie')!.split(';')[0];
+    };
+    const admin = await signIn('streamer'),
+      alice = await signIn('viewer'),
+      bob = await signIn('viewer');
+    assert.equal((await (await call('/api/session', alice)).json()).controller, false);
+    const initialState = await (await call('/api/state', admin)).json();
+    const initialOverlayUrl = new URL(initialState.obsUrl);
+    const overlayPath =
+      initialOverlayUrl.pathname.replace('/obs', '/api/overlay') + initialOverlayUrl.search;
+    const initialOverlay = await (await call(overlayPath)).json();
+    assert.equal(initialOverlay.spin, null);
+    assert.deepEqual(initialOverlay.entries, initialState.entries);
+    assert.ok(initialOverlay.entries.length > 0);
+    assert.equal(initialOverlay.groups, undefined);
+    assert.equal(initialOverlay.participants, undefined);
+    assert.equal(
+      (await call('/api/action', admin, { type: 'question-language', value: 'es' })).status,
+      200,
+    );
+    assert.equal(
+      (await call('/api/action', admin, { type: 'ui-language', value: 'ru' })).status,
+      200,
+    );
+    const localized = await (await call('/api/state', admin)).json();
+    const localizedOBS = await (
+      await call(
+        initialOverlayUrl.pathname.replace('/obs', '/api/overlay') + initialOverlayUrl.search,
+      )
+    ).json();
+    assert.equal(
+      localized.groups[0].text,
+      '¿En qué te enfocarías para hacer crecer una comunidad pequeña en Twitch?',
+    );
+    assert.equal(localized.groups[0].questions[0].text, initialState.groups[0].questions[0].text);
+    assert.equal(
+      (
+        await call('/api/action', admin, {
+          type: 'edit',
+          id: localized.groups[0].id,
+          title: 'Mi comunidad',
+          value: 'es',
+        })
+      ).status,
+      200,
+    );
+    const editedLanguage = await (await call('/api/state', admin)).json();
+    assert.equal(editedLanguage.groups[0].title, 'Mi comunidad');
+    assert.equal(
+      editedLanguage.groups[0].questions[0].text,
+      initialState.groups[0].questions[0].text,
+    );
+    assert.equal(localizedOBS.uiLanguage, 'ru');
+    assert.deepEqual(localizedOBS.entries, localized.entries);
+    assert.equal(
+      (await call('/api/action', admin, { type: 'question-language', value: 'fr' })).status,
+      400,
+    );
+    await call('/api/action', admin, { type: 'question-language', value: 'original' });
+    await call('/api/action', admin, { type: 'ui-language', value: 'en' });
 
-
-    for (const type of ['spin','answer','merge','split','settings','registration','reopen','clear-questions','clear-participants','new-session','pause-replies','limits','reprocess','rotate-obs','ui-language','question-language']) assert.equal((await call('/api/action',alice,{type})).status,403);
-    await call('/api/action',alice,{type:'ask',text:'My private original question'});
-    let a=await (await call('/api/state',alice)).json();
-    const own=a.groups.find((g: {text:string})=>g.text==='My private original question');
-    const updatedOverlay=await (await call(overlayPath)).json();
-    assert.equal(updatedOverlay.entries.length,initialOverlay.entries.length+1);
-    assert.equal(own.questions.length,1); assert.equal(a.obsUrl,undefined);
-    let b=await (await call('/api/state',bob)).json(); assert.equal(b.groups.find((g: {id:string})=>g.id===own.id).questions.length,0);
-    await call('/api/action',alice,{type:'support',id:own.id}); await call('/api/action',alice,{type:'ask',text:'My private original question'});
-    a=await (await call('/api/state',alice)).json(); assert.equal(a.groups.find((g: {id:string})=>g.id===own.id).count,1);
-    await call('/api/action',admin,{type:'answer',id:own.id,text:'Approved exact answer'});
-    a=await (await call('/api/state',alice)).json(); b=await (await call('/api/state',bob)).json();
-    assert.equal(a.groups.find((g: {id:string})=>g.id===own.id).answer,'Approved exact answer');
-    assert.equal(b.groups.find((g: {id:string})=>g.id===own.id).answer,'');
-    await call('/api/action',bob,{type:'ask',text:'My private original question'});
-    b=await (await call('/api/state',bob)).json(); assert.equal(b.groups.find((g: {id:string})=>g.id===own.id).answer,'Approved exact answer');
-    assert.equal((await call('/api/action',admin,{type:'new-session',confirmed:true})).status,200);
-    b=await (await call('/api/state',bob)).json();assert.equal(b.groups.find((g:{id:string})=>g.id===own.id).answer,'');
-    const archived=await (await call('/api/state',admin)).json();assert.equal(archived.groups.find((g:{id:string})=>g.id===own.id).answer,'Approved exact answer');
-    await call('/api/action',admin,{type:'answer',id:own.id,text:'Permanent answer',value:'permanent'});
-    await call('/api/action',admin,{type:'new-session',confirmed:true});
-    b=await (await call('/api/state',bob)).json();assert.equal(b.groups.find((g:{id:string})=>g.id===own.id).answer,'Permanent answer');
-    assert.equal((await call('/api/action',admin,{type:'pause-replies',value:true})).status,200);
-    assert.equal((await (await call('/api/state',admin)).json()).repliesPaused,true);
-    await call('/api/action',admin,{type:'reopen',id:own.id});
-    assert.equal((await call('/api/action',admin,{type:'spin',id:own.id})).status,200);
-    const dashboard=await (await call('/api/state',admin)).json();
-    const overlayUrl=new URL(dashboard.obsUrl);
-    const overlay=await (await call(overlayUrl.pathname.replace('/obs','/api/overlay')+overlayUrl.search)).json();
-    assert.deepEqual(overlay.spin,dashboard.spin); assert.equal(overlay.groups,undefined); assert.equal(dashboard.spin.winner,own.id);
-    await call('/api/action',admin,{type:'spin'});
-    assert.equal((await call('/api/action',admin,{type:'spin'})).status,409);
-    for (const type of ['clear-questions','clear-participants','question-language']) assert.equal((await call('/api/action',admin,{type,confirmed:true})).status,409);
-    await new Promise(resolve => setTimeout(resolve, 6100));
-    await call('/api/action',alice,{type:'join'});
-    const beforeClear=await (await call('/api/state',admin)).json();
-    assert.equal((await call('/api/action',admin,{type:'clear-questions'})).status,400);
-    assert.equal((await call('/api/action',admin,{type:'clear-questions',confirmed:true})).status,200);
-    let cleared=await (await call('/api/state',admin)).json();
-    assert.equal(cleared.groups.length,0); assert.equal(cleared.participants.length,beforeClear.participants.length); assert.equal(cleared.spin,null);
-    assert.deepEqual((await (await call(overlayPath)).json()).entries,[]);
-    const backupFiles=readdirSync(join(dir,'backups'));
-    assert.equal(backupFiles.length,1);
-    const backup=JSON.parse(readFileSync(join(dir,'backups',backupFiles[0]),'utf8'));
-    assert.equal(backup.groups.length,beforeClear.groups.length); assert.equal(backup.participants.length,beforeClear.participants.length);
-    assert.equal((await call('/api/action',admin,{type:'clear-participants',confirmed:true})).status,200);
-    cleared=await (await call('/api/state',admin)).json();
-    assert.equal(cleared.participants.length,0); assert.equal(cleared.groups.length,0);
-    assert.equal(readdirSync(join(dir,'backups')).length,2);
-    await call('/api/action',admin,{type:'registration',value:false});
-    assert.equal((await call('/api/action',admin,{type:'rotate-obs',confirmed:true})).status,200);
-    assert.equal((await call(overlayPath)).status,403);
-    const rotated=await (await call('/api/state',admin)).json();assert.notEqual(rotated.obsUrl,initialState.obsUrl);
-  } finally { child.kill(); await new Promise(resolve=>child.once('exit',resolve)); rmSync(dir,{recursive:true,force:true}); }
+    for (const type of [
+      'spin',
+      'answer',
+      'merge',
+      'split',
+      'settings',
+      'registration',
+      'reopen',
+      'clear-questions',
+      'clear-participants',
+      'new-session',
+      'pause-replies',
+      'limits',
+      'reprocess',
+      'rotate-obs',
+      'ui-language',
+      'question-language',
+    ])
+      assert.equal((await call('/api/action', alice, { type })).status, 403);
+    await call('/api/action', alice, { type: 'ask', text: 'My private original question' });
+    let a = await (await call('/api/state', alice)).json();
+    const own = a.groups.find((g: { text: string }) => g.text === 'My private original question');
+    const updatedOverlay = await (await call(overlayPath)).json();
+    assert.equal(updatedOverlay.entries.length, initialOverlay.entries.length + 1);
+    assert.equal(own.questions.length, 1);
+    assert.equal(a.obsUrl, undefined);
+    let b = await (await call('/api/state', bob)).json();
+    assert.equal(b.groups.find((g: { id: string }) => g.id === own.id).questions.length, 0);
+    await call('/api/action', alice, { type: 'support', id: own.id });
+    await call('/api/action', alice, { type: 'ask', text: 'My private original question' });
+    a = await (await call('/api/state', alice)).json();
+    assert.equal(a.groups.find((g: { id: string }) => g.id === own.id).count, 1);
+    await call('/api/action', admin, { type: 'answer', id: own.id, text: 'Approved exact answer' });
+    a = await (await call('/api/state', alice)).json();
+    b = await (await call('/api/state', bob)).json();
+    assert.equal(
+      a.groups.find((g: { id: string }) => g.id === own.id).answer,
+      'Approved exact answer',
+    );
+    assert.equal(b.groups.find((g: { id: string }) => g.id === own.id).answer, '');
+    await call('/api/action', bob, { type: 'ask', text: 'My private original question' });
+    b = await (await call('/api/state', bob)).json();
+    assert.equal(
+      b.groups.find((g: { id: string }) => g.id === own.id).answer,
+      'Approved exact answer',
+    );
+    assert.equal(
+      (await call('/api/action', admin, { type: 'new-session', confirmed: true })).status,
+      200,
+    );
+    b = await (await call('/api/state', bob)).json();
+    assert.equal(b.groups.find((g: { id: string }) => g.id === own.id).answer, '');
+    const archived = await (await call('/api/state', admin)).json();
+    assert.equal(
+      archived.groups.find((g: { id: string }) => g.id === own.id).answer,
+      'Approved exact answer',
+    );
+    await call('/api/action', admin, {
+      type: 'answer',
+      id: own.id,
+      text: 'Permanent answer',
+      value: 'permanent',
+    });
+    await call('/api/action', admin, { type: 'new-session', confirmed: true });
+    b = await (await call('/api/state', bob)).json();
+    assert.equal(b.groups.find((g: { id: string }) => g.id === own.id).answer, 'Permanent answer');
+    assert.equal(
+      (await call('/api/action', admin, { type: 'pause-replies', value: true })).status,
+      200,
+    );
+    assert.equal((await (await call('/api/state', admin)).json()).repliesPaused, true);
+    await call('/api/action', admin, { type: 'reopen', id: own.id });
+    assert.equal((await call('/api/action', admin, { type: 'spin', id: own.id })).status, 200);
+    const dashboard = await (await call('/api/state', admin)).json();
+    const overlayUrl = new URL(dashboard.obsUrl);
+    const overlay = await (
+      await call(overlayUrl.pathname.replace('/obs', '/api/overlay') + overlayUrl.search)
+    ).json();
+    assert.deepEqual(overlay.spin, dashboard.spin);
+    assert.equal(overlay.groups, undefined);
+    assert.equal(dashboard.spin.winner, own.id);
+    await call('/api/action', admin, { type: 'spin' });
+    assert.equal((await call('/api/action', admin, { type: 'spin' })).status, 409);
+    for (const type of ['clear-questions', 'clear-participants', 'question-language'])
+      assert.equal((await call('/api/action', admin, { type, confirmed: true })).status, 409);
+    await new Promise((resolve) => setTimeout(resolve, 6100));
+    await call('/api/action', alice, { type: 'join' });
+    const beforeClear = await (await call('/api/state', admin)).json();
+    assert.equal((await call('/api/action', admin, { type: 'clear-questions' })).status, 400);
+    assert.equal(
+      (await call('/api/action', admin, { type: 'clear-questions', confirmed: true })).status,
+      200,
+    );
+    let cleared = await (await call('/api/state', admin)).json();
+    assert.equal(cleared.groups.length, 0);
+    assert.equal(cleared.participants.length, beforeClear.participants.length);
+    assert.equal(cleared.spin, null);
+    assert.deepEqual((await (await call(overlayPath)).json()).entries, []);
+    const backupFiles = readdirSync(join(dir, 'backups'));
+    assert.equal(backupFiles.length, 1);
+    const backup = JSON.parse(readFileSync(join(dir, 'backups', backupFiles[0]), 'utf8'));
+    assert.equal(backup.groups.length, beforeClear.groups.length);
+    assert.equal(backup.participants.length, beforeClear.participants.length);
+    assert.equal(
+      (await call('/api/action', admin, { type: 'clear-participants', confirmed: true })).status,
+      200,
+    );
+    cleared = await (await call('/api/state', admin)).json();
+    assert.equal(cleared.participants.length, 0);
+    assert.equal(cleared.groups.length, 0);
+    assert.equal(readdirSync(join(dir, 'backups')).length, 2);
+    await call('/api/action', admin, { type: 'registration', value: false });
+    assert.equal(
+      (await call('/api/action', admin, { type: 'rotate-obs', confirmed: true })).status,
+      200,
+    );
+    assert.equal((await call(overlayPath)).status, 403);
+    const rotated = await (await call('/api/state', admin)).json();
+    assert.notEqual(rotated.obsUrl, initialState.obsUrl);
+  } finally {
+    child.kill();
+    await new Promise((resolve) => child.once('exit', resolve));
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
