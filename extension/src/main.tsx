@@ -9,6 +9,7 @@ import {SerializedLoader} from '../../src/api';
 import type {UILanguage} from '../../src/catalog';
 import {connectHelper,type TwitchAuthorization} from './sdk';
 import {extensionRequest,type ExtensionState,type PersonalLanguage,apiOrigin} from './api';
+import {useOverlayPosition} from './useOverlayPosition';
 import './style.css';
 const params=new URLSearchParams(location.search),preview=location.pathname.endsWith('preview.html');
 const view=preview?params.get('view')||'viewer':location.pathname.endsWith('live.html')?'live':location.pathname.endsWith('config.html')?'config':location.pathname.endsWith('overlay.html')?'overlay':'viewer';
@@ -16,6 +17,7 @@ function ExtensionApp(){
  const {t,language,setLanguage,hasPreference}=useExtensionI18n();
  const [auth,setAuth]=useState<TwitchAuthorization|null>(null),[state,setState]=useState<ExtensionState|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[ready,setReady]=useState(false),[question,setQuestion]=useState(''),[selected,setSelected]=useState(''),[answer,setAnswer]=useState('');
  const [questionLanguage,setQuestionLanguage]=useState<PersonalLanguage>('inherit');
+ const panel=useOverlayPosition(view==='overlay',auth?.channelId||'preview');
  const [now,setNow]=useState(Date.now()),[clock,setClock]=useState(0);const authorization=useRef<TwitchAuthorization|null>(null),preference=useRef<PersonalLanguage>('inherit'),disposed=useRef(false);
  const loader=useRef<SerializedLoader|null>(null);
  if(!loader.current)loader.current=new SerializedLoader(async()=>{const query=preference.current==='inherit'?'':'?language='+preference.current;const next=await extensionRequest('/state'+query,authorization.current?.token,undefined,preview) as ExtensionState;if(!disposed.current){setState(next);setClock(next.serverTime-Date.now());setError('');}});
@@ -34,8 +36,8 @@ function ExtensionApp(){
  function chooseQuestions(value:PersonalLanguage){preference.current=value;setQuestionLanguage(value);try{localStorage.setItem('chatspin.extension.questions.'+(auth?.channelId||'preview'),value);}catch{}void loader.current!.load(true).catch(e=>setError(e.message));}
  const inSpin=!!state?.spin&&state.spin.end>now+clock,result=!inSpin?state?.spin:null;
  const presentation=state?wheelPresentation(state.entries,state.spin,state.mode,now+clock):null;
- return <main className={'extension-shell '+view}>
-  <header><strong>✦ ChatSpin</strong>{preview&&<span className="badge">{t('DEMO · SIMULATED DATA')}</span>}</header>
+ return <main ref={panel.ref} style={panel.style} className={'extension-shell '+view+(panel.dragging?' dragging':'')}>
+  <header>{view==='overlay'?<button className="overlay-drag-handle" aria-label={t('Move ChatSpin panel')} title={t('Drag to move. Arrow keys move; Home resets.')} {...panel.handle}><strong>✦ ChatSpin</strong><span aria-hidden="true">⠿</span></button>:<strong>✦ ChatSpin</strong>}{preview&&<span className="badge">{t('DEMO · SIMULATED DATA')}</span>}</header>
   <section className="extension-card">
    <div className="languages"><label>{t('Interface language')}<select aria-label={t('Interface language')} value={language} onChange={e=>setLanguage(e.target.value as UILanguage)}><option value="en">English</option><option value="es">Español</option><option value="ru">Русский</option><option value="de">Deutsch</option></select></label><label>{t('Question language')}<select aria-label={t('Question language')} value={questionLanguage} onChange={e=>chooseQuestions(e.target.value as PersonalLanguage)}><option value="inherit">{t('Follow channel language')}</option><option value="original">{t('Original language')}</option><option value="en">{t('English')}</option><option value="es">{t('Spanish')}</option><option value="ru">{t('Russian')}</option><option value="de">{t('German')}</option></select></label></div>
    {error&&<p className="error" role="alert">{t(error)}</p>}

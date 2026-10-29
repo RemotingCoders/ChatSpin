@@ -1,5 +1,7 @@
 import {useI18n} from '../../src/i18n';
 const messages:Record<string,[string,string,string]>={
+ 'Move ChatSpin panel':['Mover panel de ChatSpin','ChatSpin-Panel verschieben','Переместить панель ChatSpin'],
+ 'Drag to move. Arrow keys move; Home resets.':['Arrastrá para mover. Las flechas mueven; Inicio restablece.','Zum Verschieben ziehen. Pfeiltasten bewegen; Pos1 setzt zurück.','Перетащите для перемещения. Стрелки перемещают; Home сбрасывает.'],
  'Follow channel language':['Seguir idioma del canal','Sprache des Kanals übernehmen','Использовать язык канала'],
  'Open this view inside Twitch, or use the local preview.':['Abrí esta vista dentro de Twitch o usá la vista previa local.','Öffne diese Ansicht in Twitch oder nutze die lokale Vorschau.','Откройте эту страницу в Twitch или используйте локальный просмотр.'],
  'Local preview is available only in development.':['La vista previa local solo está disponible en desarrollo.','Die lokale Vorschau ist nur in der Entwicklung verfügbar.','Локальный просмотр доступен только в режиме разработки.'],

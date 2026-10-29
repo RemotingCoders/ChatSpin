@@ -42,3 +42,13 @@ The config view links to the web dashboard to connect the broadcaster's own Twit
 ## Local demo preview
 
 Run the existing development server and open `/extension/preview.html` in a private browser window. Use **Preview as viewer** or **Preview as streamer**. The preview uses an isolated simulated session, does not call Twitch or OpenAI and cannot authorize real channel actions. `?view=live` previews broadcaster controls. It uses the development web cookie, so use a separate browser profile/window to avoid replacing your current dashboard session. The preview is omitted from uploaded extension builds and its backend returns 404 in production.
+
+### Personal overlay position
+
+In the video overlay, drag the ChatSpin header to move the panel. The same handle
+supports arrow keys (Shift for larger steps) and Home to restore the top-right
+position. The browser remembers the position for that channel locally; it does
+not change the broadcaster's settings or another viewer's layout. Positions stay
+inside the video when its size changes, including fullscreen. Panel and mobile
+views keep their regular layout. Upload a newly generated extension ZIP to Twitch
+to deliver this frontend change.
