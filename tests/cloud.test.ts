@@ -87,3 +87,16 @@ test('AI error status exposes only known failure categories, never provider mess
  assert.match(aiFailure({status:429,code:'insufficient_quota'},'Retry queued'),/quota exhausted/);
  assert.equal(aiFailure({status:500,message:'private question and key'},'Retry queued'),'Retry queued');
 });
+
+import {processCloudChannel} from '../server/cloud-work.ts';
+test('Hosted worker persists provider failures and releases the channel after failed grouping and translation',async()=>{
+ const {repository}=database(),oldKey=process.env.OPENAI_API_KEY;process.env.OPENAI_API_KEY='test-only';
+ try{
+  await repository.mutate('101',state=>{addQuestion(state,{id:'7',name:'Viewer'},'Que estas haciendo?');state.questionLanguage='en';state.cloudMaintenance=Date.now();});
+  const failure=async(state:ReturnType<typeof emptyState>)=>{reserveAI(state,100);await flushBudget(state);throw Object.assign(Error('private provider message'),{status:401});};
+  await processCloudChannel(repository,'101',{group:async state=>failure(state),translate:async(_items,_language,state)=>failure(state)});
+  const {state}=await repository.load('101');assert.equal(state.aiBudget?.calls,2);assert.equal(state.usage.calls,0);assert.equal(state.cloudLease,undefined);
+  assert.match(state.cloudStatus!.ai,/authentication failed/);assert.match(state.cloudStatus!.translation,/authentication failed/);
+  assert.equal(state.groups[0].text,'Que estas haciendo?');assert.equal(state.groups[0].translations?.en,undefined);
+ }finally{if(oldKey===undefined)delete process.env.OPENAI_API_KEY;else process.env.OPENAI_API_KEY=oldKey;}
+});

@@ -7,7 +7,7 @@ import {cloudExtensionRouter} from '../extension/server/cloud.js';
 import {cloudAuthentication} from './cloud-auth.js';
 import {cloudDashboardAction} from './cloud-actions.js';
 import {cloudWebhooks} from './cloud-twitch.js';
-import {processCloudChannel} from './cloud-work.js';
+import {processCloudChannel,CloudProcessingError} from './cloud-work.js';
 import {questionPresentation,presentedSpin} from './presentation.js';
 import {answerIsActive,eligibleEntries,support} from './domain.js';
 import {settings} from './limits.js';
@@ -15,7 +15,7 @@ import {languageSchema} from '../extension/server/service.js';
 
 export function createCloudApp(repository:SupabaseRepository,origin:string,secret:string,background:(promise:Promise<unknown>)=>void=waitUntil){
  const app=express();app.disable('x-powered-by');app.set('trust proxy',1);
- const schedule=(channel:string)=>background(processCloudChannel(repository,channel).catch(()=>{console.error('ChatSpin background processing failed; work remains persisted for retry.');}));
+ const schedule=(channel:string)=>background(processCloudChannel(repository,channel).catch(error=>{console.error(error instanceof CloudProcessingError?error.message:'ChatSpin background processing failed; work remains persisted for retry.');}));
  app.use((req,res,next)=>{res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');next();});
  app.get('/api/cron',async(req,res)=>{
   const cron=process.env.CRON_SECRET;if(!cron||req.get('authorization')!=='Bearer '+cron)return res.sendStatus(403);
@@ -77,7 +77,8 @@ export function createCloudApp(repository:SupabaseRepository,origin:string,secre
   res.json({ok:true});
  });
  app.use((_req,res)=>res.status(404).json({error:'Endpoint not found.'}));
- app.use((error:Error&{status?:number},_req:express.Request,res:express.Response,_next:express.NextFunction)=>{
+ app.use((error:Error&{status?:number},_req:express.Request,res:express.Response,next:express.NextFunction)=>{
+  if(res.headersSent)return next(error);
   const status=error instanceof StateConflict||error instanceof ChannelBusy?409:error instanceof z.ZodError?400:error.status||500;
   res.status(status).json({error:status===500?'Cloud request failed. Please retry.':error instanceof z.ZodError?'Please check the supplied values.':error.message});
  });
