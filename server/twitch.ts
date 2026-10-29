@@ -19,12 +19,13 @@ export class TwitchConnection {
     private expires: number;
     private refreshing?: Promise<string>;
     private validating = false;
-    constructor(private credentials: Credentials, private broadcaster: string, private onMessage: (user: User, text: string, messageId?: string) => void, private endpoint = 'wss://eventsub.wss.twitch.tv/ws', private save: (credentials: Credentials | null) => void = () => { }) { this.expires = credentials.expires_at || Date.now() + credentials.expires_in * 1000; }
+    constructor(private credentials: Credentials, private broadcaster: string, private onMessage: (user: User, text: string, messageId?: string) => void, private endpoint = 'wss://eventsub.wss.twitch.tv/ws', private save: (credentials: Credentials | null) => void = () => { }, private beforeSend:()=>Promise<void>=async()=>{}) { this.expires = credentials.expires_at || Date.now() + credentials.expires_in * 1000; }
     get canWriteChat() { return this.credentials.scope?.includes('user:write:chat') === true; }
     async sendChatMessage(message: string, parentId: string) {
         if (!this.canWriteChat || this.status !== 'Connected')
             throw new Error('Reconnect Twitch with chat write permission.');
-        const response = await timedFetch('https://api.twitch.tv/helix/chat/messages', { method: 'POST', headers: { Authorization: `Bearer ${await this.token()}`, 'Client-Id': process.env.TWITCH_CLIENT_ID!, 'Content-Type': 'application/json' }, body: JSON.stringify({ broadcaster_id: this.broadcaster, sender_id: this.broadcaster, message, reply_parent_message_id: parentId }) });
+        const token=await this.token();await this.beforeSend();
+        const response = await timedFetch('https://api.twitch.tv/helix/chat/messages', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Client-Id': process.env.TWITCH_CLIENT_ID!, 'Content-Type': 'application/json' }, body: JSON.stringify({ broadcaster_id: this.broadcaster, sender_id: this.broadcaster, message, reply_parent_message_id: parentId }) });
         if(response.status===401||response.status===403){this.stop();this.save(null);this.status='Authorization expired. Connect again.';}
         if (!response.ok)
             throw new Error('Twitch rejected the chat reply.');

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {SupabaseRepository} from '../../server/supabase.ts';
 export function database(){
+ const snapshots:any[]=[];
  const channels=new Map<string,any>(),secrets=new Map<string,string>(),sessions=new Map<string,any>();
  const request=(async(input,init)=>{
   const url=new URL(String(input)),path=url.pathname.replace('/rest/v1/',''),body=init?.body?JSON.parse(String(init.body)):undefined;
@@ -14,13 +15,17 @@ export function database(){
   if(path==='rpc/chatspin_commit'){
    const record=channels.get(body.p_channel_id);
    if(record.revision!==body.p_revision)return response({code:'PT409'},409);
+   if(body.p_snapshot)snapshots.push({id:snapshots.length+1,channel_id:body.p_channel_id,state:structuredClone(record.state),created_at:new Date().toISOString()});
    record.state=body.p_state;record.revision++;return response(record.revision);
   }
+  if(path==='chatspin_snapshots'){const id=url.searchParams.get('id')?.slice(3);return response(snapshots.filter(row=>row.channel_id===channel&&(!id||String(row.id)===id)).reverse());}
   if(path==='chatspin_secrets'){
    if(init?.method==='POST'){secrets.set(body.channel_id+':'+body.name,body.ciphertext);return response(undefined,201);}
    if(url.searchParams.get('name')==='like.inbox:*')return response([...secrets].filter(([key])=>key.startsWith(channel+':inbox:')).map(([key,ciphertext])=>({name:key.slice(channel!.length+1),ciphertext})));
    const key=channel+':'+url.searchParams.get('name')?.slice(3);
-   if(init?.method==='DELETE'){secrets.delete(key);return response(null,204);}
+   const expected=url.searchParams.get('ciphertext')?.slice(3);if(expected!==undefined&&secrets.get(key)!==expected)return response([]);
+   if(init?.method==='PATCH'){secrets.set(key,body.ciphertext);return response([{ciphertext:body.ciphertext}]);}
+   if(init?.method==='DELETE'){const previous=secrets.get(key);secrets.delete(key);return expected===undefined?response(null,204):response(previous?[{ciphertext:previous}]:[]);}
    return response(secrets.has(key)?[{ciphertext:secrets.get(key)}]:[]);
   }
   if(path==='chatspin_sessions'){
@@ -31,5 +36,5 @@ export function database(){
   }
   throw Error('Unexpected database request '+path);
  }) as typeof fetch;
- return {repository:new SupabaseRepository('https://project.supabase.co','server-only','a'.repeat(40),request),channels,secrets};
+ return {repository:new SupabaseRepository('https://project.supabase.co','server-only','a'.repeat(40),request),channels,secrets,snapshots};
 }

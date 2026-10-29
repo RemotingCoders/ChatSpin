@@ -2,13 +2,13 @@ import {aiFailure} from './ai-status.js';
 import { addQuestion, answerIsActive, normalize, type Group, type State, type User } from './domain.js';
 import { extractChatQuestion } from './chat.js';
 export class QuestionWork {
-    private rates = new Map<string, number[]>();
+    private get rates():Record<string,number[]>{return (this.state as State&{questionRates?:Record<string,number[]>}).questionRates||=(({}));}
     busy = false;
     status = 'Ready';
     constructor(private state: State, private persist: () => void, private detect: (messages: {
         id: string;
         text: string;
-    }[]) => Promise<string[]>, private group: (ids: string[]) => Promise<void>, private reply: (group: Group, user: User, messageId: string) => void) {
+    }[]) => Promise<string[]>, private group: (ids: string[]) => Promise<void>, private reply: (group: Group, user: User, messageId: string, questionText?: string) => void) {
         state.aiJobs ||= [];
         state.pendingMessages ||= [];
         for (const g of state.groups)
@@ -22,24 +22,25 @@ export class QuestionWork {
     ingest(user: User, text: string, messageId: string, now = Date.now()) {
         this.deliver(now);
         if (this.state.pendingMessages!.some(m => m.messageId === messageId))
-            return;
+            return true;
         if (this.state.pendingMessages!.length >= 100) {
-            this.status = 'Question inbox full — new messages skipped';
-            return;
+            this.status = 'Question inbox full — new messages waiting';
+            return false;
         }
-        for (const [id, times] of this.rates)
-            if (!times.some(t => t > now - 60000))
-                this.rates.delete(id);
-        const recent = (this.rates.get(user.id) || []).filter(t => t > now - 60000);
+        const rateNow=Date.now();
+        for (const [id, times] of Object.entries(this.rates))
+            if (!times.some(t => t > rateNow - 60000))
+                delete this.rates[id];
+        const recent = (this.rates[user.id] || []).filter(t => t > rateNow - 60000);
         if (recent.length >= 10) {
             this.status = 'Viewer question limit reached';
-            return;
+            return false;
         }
-        recent.push(now);
-        this.rates.set(user.id, recent);
+        recent.push(rateNow);
+        this.rates[user.id]=recent;
         const question = extractChatQuestion(text);
         if (!question && (/^[!/]/u.test(text.trim()) || !/[\p{L}\p{N}]/u.test(text) || text.length > 500))
-            return;
+            return true;
         const message = { user, text: question || text, messageId, at: now, attempts: 0, next: 0, detected: !!question, originalId: undefined as string | undefined };
         this.state.pendingMessages!.push(message);
         if (question)
@@ -49,9 +50,11 @@ export class QuestionWork {
             catch {
                 this.state.pendingMessages = this.state.pendingMessages!.filter(m => m !== message);
                 this.status = 'Question capacity reached — archive or clear questions';
+                return false;
             }
         this.deliver();
         this.persist();
+        return true;
     }
     private register(message: NonNullable<State['pendingMessages']>[number]) {
         const group = addQuestion(this.state, message.user, message.text, message.messageId, message.at);
@@ -70,7 +73,7 @@ export class QuestionWork {
             if (!g)
                 return false;
             if (answerIsActive(this.state, g)) {
-                this.reply(g, message.user, message.messageId);
+                this.reply(g, message.user, message.messageId, message.text);
                 return false;
             }
             return g.status === 'pending' && (!g.aiProcessed || !!g.review);

@@ -46,7 +46,7 @@ Set variables in `.env`; never commit it.
 
 Changing `PORT` also requires changing `APP_URL`. Set `APP_URL` to the exact HTTPS public origin when using a reverse proxy. Set `TRUST_PROXY_HOPS=1` only when exactly one trusted reverse proxy terminates HTTPS; the default is `0` (no trusted proxy). Production requires a random signing/encryption secret of at least 32 characters.
 
-OpenAI API usage requires your own API configuration and billing; a ChatGPT or Codex subscription does not provide this application's API credentials. Usage displays request and input/output token totals. Estimate spend using your model's current API rates. Without a key, exact duplicate matching remains available; other questions stay separate.
+OpenAI API usage requires your own API configuration and billing; a ChatGPT or Codex subscription does not provide this application's API credentials. Usage displays request and input/output token totals. Estimate spend using your model's current API rates. Without a key, exact duplicate matching remains available; questions require explicit manual approval before entering the wheel. Forced-language translation still requires AI; select original language to use a manually reviewed question without translation.
 
 ## Real Twitch walkthrough
 
@@ -162,3 +162,11 @@ The labeled demo has prepared question translations in all four languages and ma
 The existing local app remains available. The optional [`extension/`](extension/README.md) provides panel, overlay, mobile, configuration and live control views with Twitch JWT authentication and personal display language. Hosted operation uses [`api/cloud.ts`](api/cloud.ts), Supabase tables with the `chatspin_` prefix, per-channel OAuth credentials and EventSub webhooks. It has no global broadcaster account. See [Vercel/Supabase deployment](docs/hosting.md) for variables, SQL, cron, installation paths, limitations and real-world verification. The normal Vite build serves the dashboard; the Twitch frontend ZIP is built separately.
 
 Public legal documents are served at `/privacy.html` and `/terms.html`; they distinguish the MIT source license from any future hosted service. Billing and Bits monetization are not implemented.
+
+## Hosted reliability and operator controls
+
+The hosted service hides AI budget editors and rejects budget changes through the API. Daily provider-controlled channel/global allowances live separately from session state and cannot be reset by a streamer or backup restoration. See [operator quotas and monetization](docs/monetization.md). Install the quota migration before deploying this version.
+
+Cloud owners can delegate extension controls to explicitly listed Twitch moderators, review processing failures, manually approve questions, preview channel backups and restore them with confirmation. Restore preserves current moderator delegation and never replays old public replies. Local installation settings remain available.
+
+See [rollout and live acceptance checklist](docs/stabilization-verification.md) for deployment order and the real Twitch checks that automated tests do not replace.

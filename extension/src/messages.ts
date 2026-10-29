@@ -1,5 +1,8 @@
 import {useI18n} from '../../src/i18n';
 const messages:Record<string,[string,string,string]>={
+ 'Answer translation failed. Waiting for a retry.':['Falló la traducción de la respuesta. Esperando un reintento.','Die Übersetzung der Antwort ist fehlgeschlagen. Warten auf einen erneuten Versuch.','Не удалось перевести ответ. Ожидание повторной попытки.'],
+ 'Translating the approved answer…':['Traduciendo la respuesta aprobada…','Die freigegebene Antwort wird übersetzt…','Перевод одобренного ответа…'],
+ 'Edit the original approved answer. Viewers see its translation in their selected language.':['Editás la respuesta original aprobada. Cada espectador ve la traducción en el idioma que eligió.','Bearbeite die freigegebene Originalantwort. Zuschauer sehen die Übersetzung in ihrer gewählten Sprache.','Вы редактируете исходный одобренный ответ. Зрители видят перевод на выбранном ими языке.'],
  'Remove from wheel':['Quitar de la ruleta','Aus dem Rad entfernen','Убрать из колеса'],
  'Save answer':['Guardar respuesta','Antwort speichern','Сохранить ответ'],
  'Save answer and mark answered':['Guardar respuesta y marcar como respondida','Antwort speichern und als beantwortet markieren','Сохранить ответ и отметить вопрос отвеченным'],

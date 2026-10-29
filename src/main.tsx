@@ -177,7 +177,7 @@ function App() {
             </section>
             <div className="bottom-note">
             <span>✧ {session.demo ? t("Demo grouping is curated. Live AI: ") : t("AI grouping: ")}{t(session.ai)}</span>
-            <span>{state.usage.calls}{t(" calls \u00B7 ")}{state.usage.input + state.usage.output} {t("tokens")}</span>
+            {!state.hosted&&<span>{state.usage.calls}{t(" calls \u00B7 ")}{state.usage.input + state.usage.output} {t("tokens")}</span>}
             </div>
             <section className="panel compact">
             <div>

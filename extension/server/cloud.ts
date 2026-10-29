@@ -25,13 +25,13 @@ export function cloudExtensionRouter(options:CloudExtensionOptions){
  router.use(express.json({limit:'8kb'}));
  function actor(s:State,c:ExtensionClaims):ExtensionActor{
   // No global moderator list: only the owner controls a new cloud channel.
-  const controller=extensionController(c,[]),id=linkedViewer(c)||(controller?c.channel_id:undefined);
+  const controller=extensionController(c,(s as State&{moderatorIds?:string[]}).moderatorIds||[]),id=linkedViewer(c)||(controller?c.channel_id:undefined);
   const known:User|undefined=id?s.groups.flatMap(g=>g.questions).find(q=>q.user.id===id)?.user||s.participants.find(p=>p.id===id):undefined;
   return {controller,user:id?(known||{id,name:'Viewer '+id}):undefined,anonymous:c.opaque_user_id.startsWith('A')};
  }
  router.get('/state',async(req,res)=>{
   const c=res.locals.claims as ExtensionClaims;
-  const [{state},configured]=await Promise.all([options.repository.load(c.channel_id),options.repository.getSecret<State['questionLanguage']>(c.channel_id,'question-language')]);if(configured)state.questionLanguage=configured;
+  const [{state},configured]=await Promise.all([options.repository.view(c.channel_id),options.repository.publicSetting<State['questionLanguage']>(c.channel_id,'question-language')]);if(configured)state.questionLanguage=configured;
   const language=languageSchema.parse(req.query.language||state.questionLanguage||'original');
   res.json(extensionState(state,actor(state,c),language));
   // Reading the wheel must not wait for a translation-demand write or an AI lease.

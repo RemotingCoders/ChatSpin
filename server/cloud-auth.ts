@@ -7,11 +7,12 @@ import {timedFetch} from './http.js';
 import {subscribeCloudChat} from './cloud-twitch.js';
 import type {Credentials} from './twitch.js';
 class SupabaseSessions extends session.Store {
+ private touched=new Map<string,number>();
  constructor(private repository:SupabaseRepository){super();}
  get(id:string,done:(error?:unknown,value?:session.SessionData|null)=>void){void this.repository.getSession<session.SessionData>(id).then(value=>done(null,value||null),done);}
  set(id:string,value:session.SessionData,done?:(error?:unknown)=>void){void this.repository.setSession(id,value,value.cookie.expires?new Date(value.cookie.expires).getTime():Date.now()+86400000).then(()=>done?.(),error=>done?.(error));}
  destroy(id:string,done?:(error?:unknown)=>void){void this.repository.destroySession(id).then(()=>done?.(),error=>done?.(error));}
- touch(id:string,value:session.SessionData,done?:(error?:unknown)=>void){this.set(id,value,done);}
+ touch(id:string,value:session.SessionData,done?:(error?:unknown)=>void){const now=Date.now();if((this.touched.get(id)||0)>now-60000){done?.();return;}this.touched.set(id,now);if(this.touched.size>1000)for(const [key,at]of this.touched)if(at<now-60000)this.touched.delete(key);this.set(id,value,error=>{if(error)this.touched.delete(id);done?.(error);});}
 }
 export function cloudAuthentication(repository:SupabaseRepository,origin:string,secret:string){
  const router=express.Router();

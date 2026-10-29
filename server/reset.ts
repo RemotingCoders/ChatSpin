@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import type { State } from './domain.js';
+import { cleanupAnswerTranslations, type State } from './domain.js';
 
 export type ClearTarget = 'questions' | 'participants';
 
@@ -17,7 +17,7 @@ export function archiveSession(state: State, stateFile: string) {
 export function clearCollection(state: State, target: ClearTarget, archive: () => void) {
   if (state.spin && state.spin.end > Date.now()) throw new Error('Wait for the current spin to finish.');
   archive();
-  if (target === 'questions') {state.groups=[];state.replyJobs=[];state.replyLog=[];state.replyHistory={};state.aiJobs=[];state.pendingMessages=[];}
+  if (target === 'questions') {cleanupAnswerTranslations(state,'clear');state.groups=[];state.replyJobs=[];state.replyLog=[];state.replyHistory={};state.aiJobs=[];state.pendingMessages=[];}
   else state.participants = [];
   if (state.spin?.mode === target) state.spin = null;
 }

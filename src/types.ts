@@ -1,10 +1,11 @@
 import type { Group, State, User } from '../server/domain';
 import type { WheelEntry } from './wheelState';
 export type ViewGroup = Group & {
-    displayLanguage?:'original'|'en'|'es'|'ru'|'de';originalText?:string;originalTitle?:string;translationPending?:boolean;count: number;answerActive?:boolean;
+    displayLanguage?:'original'|'en'|'es'|'ru'|'de';originalText?:string;originalTitle?:string;translationPending?:boolean;readiness?:import('../server/presentation').QuestionReadiness;count: number;answerActive?:boolean;
 };
 export type ViewState = Omit<State, 'groups'> & {
     groups: ViewGroup[];
+    hosted?:boolean;moderatorIds?:string[];
     obsUrl?: string;
     entries?: WheelEntry[];
     serverTime: number;translationStatus?:string;translationPending?:boolean;

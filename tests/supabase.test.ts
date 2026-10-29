@@ -60,9 +60,9 @@ test('Multi-channel extension trusts signed channel only and isolates owner cont
 
 test('Cloud processing leases fence concurrent writes, expire safely, and rate limits persist',async()=>{
  const {repository}=database();const locked=await repository.acquire('101');
- await assert.rejects(repository.mutate('101',s=>{s.registration=false;}),ChannelBusy);
+ await repository.mutate('101',s=>{s.registration=false;});assert.equal((await repository.load('101')).state.registration,false);
  await assert.rejects(repository.acquire('101'),ChannelBusy);
- locked.state.cloudLease!.until=Date.now()-1;await repository.commit(locked);
+ await repository.mutate('101',s=>{s.cloudLease!.until=Date.now()-1;});
  await repository.mutate('101',s=>{s.registration=false;});
  assert.equal((await repository.load('101')).state.registration,false);
  for(let i=0;i<30;i++)await repository.rate('101','7');

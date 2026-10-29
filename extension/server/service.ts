@@ -1,16 +1,18 @@
 import {z} from 'zod';
-import {addQuestion,answerIsActive,eligibleEntries,rememberAnswer,spin,support,type State,type User} from '../../server/domain.js';
-import {questionPresentation,type QuestionLanguage} from '../../server/presentation.js';
+import {approvedAnswerPresentation} from '../../server/answer-translations.js';
+import {addQuestion,approveQuestion,answerIsActive,eligibleEntries,rememberAnswer,spin,support,type State,type User} from '../../server/domain.js';
+import {questionPresentation,questionReadiness,type QuestionLanguage} from '../../server/presentation.js';
 export const languages=['original','en','es','ru','de'] as const;
 export const languageSchema=z.enum(languages);
 export type ExtensionActor={user?:User;controller:boolean;anonymous:boolean};
 export function extensionState(s:State,actor:ExtensionActor,language:QuestionLanguage){
  const presentation=(id:string)=>{const g=s.groups.find(g=>g.id===id);return g?questionPresentation({...s,questionLanguage:language},g):undefined;};
  const entries=eligibleEntries(s).filter(e=>s.mode!=='questions'||!presentation(e.id)?.pending).map(e=>({...e,label:s.mode==='questions'?presentation(e.id)?.title||e.label:e.label}));
- const draw=s.spin?{...s.spin,candidates:s.spin.candidates.map(e=>({...e,label:s.spin!.mode==='questions'?presentation(e.id)?.title||e.label:e.label})),...(s.spin.mode==='questions'?{text:presentation(s.spin.winner)?.text||s.spin.text,label:presentation(s.spin.winner)?.title||s.spin.label}:{})}:null;
+ const draw=s.spin?{...s.spin,candidates:s.spin.candidates.map(e=>({...e,label:s.spin!.mode==='questions'?(presentation(e.id)?.pending?'…':presentation(e.id)?.title||e.label):e.label})),...(s.spin.mode==='questions'?{text:presentation(s.spin.winner)?.pending?'':presentation(s.spin.winner)?.text||s.spin.text,label:presentation(s.spin.winner)?.pending?'…':presentation(s.spin.winner)?.title||s.spin.label}:{})}:null;
  return {controller:actor.controller,canParticipate:!!actor.user,anonymous:actor.anonymous,user:actor.user||null,demo:s.demo,mode:s.mode,odds:s.odds,registration:s.registration,excludeSelected:s.excludeSelected,entries,spin:draw,serverTime:Date.now(),uiLanguage:s.uiLanguage||'en',questionLanguage:language,participantCount:s.participants.length,joined:!!actor.user&&s.participants.some(p=>p.id===actor.user!.id),groups:s.groups.map(g=>{
+  const approved=approvedAnswerPresentation(s,g,language);
   const display=questionPresentation({...s,questionLanguage:language},g);const own=!!actor.user&&g.questions.some(q=>q.user.id===actor.user!.id);
-  return {id:g.id,title:display.title,text:display.text,translationPending:display.pending,count:support(g),status:g.status,asked:own,answer:answerIsActive(s,g)&&(own||actor.controller)?g.answer:'',originals:actor.controller?g.questions:own?g.questions.filter(q=>q.user.id===actor.user!.id):[]};
+  return {id:g.id,title:display.title,text:display.text,translationPending:display.pending,readiness:questionReadiness({...s,questionLanguage:language},g,!!process.env.OPENAI_API_KEY),count:support(g),status:g.status,asked:own,answer:answerIsActive(s,g)&&(own||actor.controller)?approved.text:'',originalAnswer:actor.controller?g.answer:undefined,answerTranslationPending:answerIsActive(s,g)&&(own||actor.controller)&&approved.pending,answerTranslationFailed:answerIsActive(s,g)&&(own||actor.controller)&&approved.failed,originals:actor.controller?g.questions:own?g.questions.filter(q=>q.user.id===actor.user!.id):[]};
  })};
 }
 const actionSchema=z.discriminatedUnion('type',[
@@ -18,6 +20,7 @@ const actionSchema=z.discriminatedUnion('type',[
  z.object({type:z.literal('support'),id:z.string().max(100)}).strict(),
  z.object({type:z.enum(['join','leave','spin','toggle-registration','toggle-exclusion'])}).strict(),
  z.object({type:z.literal('spotlight'),id:z.string().max(100)}).strict(),
+ z.object({type:z.literal('approve-question'),id:z.string().max(100)}).strict(),
  z.object({type:z.literal('mode'),value:z.enum(['questions','participants'])}).strict(),
  z.object({type:z.literal('odds'),value:z.enum(['equal','support','manual'])}).strict(),
  z.object({type:z.literal('answer'),id:z.string().max(100),text:z.string().trim().max(2000),scope:z.enum(['session','permanent']).default('session'),removeFromWheel:z.boolean().default(true)}).strict()
@@ -37,6 +40,7 @@ export function applyExtensionAction(s:State,actor:ExtensionActor,body:unknown,e
   case 'leave':s.participants=s.participants.filter(p=>p.id!==user!.id);break;
   case 'spin':spin(s);break;
   case 'spotlight':spin(s,action.id);break;
+  case 'approve-question':approveQuestion(s,action.id);break;
   case 'mode':s.mode=action.value;break;
   case 'odds':s.odds=action.value;break;
   case 'toggle-registration':s.registration=!s.registration;break;

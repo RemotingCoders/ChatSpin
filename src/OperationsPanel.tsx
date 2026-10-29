@@ -1,4 +1,5 @@
 import {useI18n} from './i18n';
+import {HostedTools} from './HostedTools';
 import { useState, useEffect } from 'react';
 import type { Act, ViewState } from './types';
 export function OperationsPanel({ state, busy, inSpin, act }: {
@@ -30,12 +31,13 @@ export function OperationsPanel({ state, busy, inSpin, act }: {
                     setConfirm(null);
             }}>{t("Confirm")}</button>
         </div>}
- <details>
+ {!state.hosted&&<details>
     <summary>{t("AI limits & retention")}</summary>
     <p className="help">{t("Budget used: ")}{state.aiBudget?.calls || 0}{t(" calls \u00B7 ")}{state.aiBudget?.tokens || 0}{t(" tokens, including failed-call reservations.")}</p>{(['aiCallLimit', 'aiTokenLimit', 'retentionDays', 'maxGroups'] as const).map((key, i) => <label key={key}>{[t("AI calls per live session"), t("AI tokens per live session"), t("Keep questions for days"), t("Maximum question groups")][i]}<input type="number" value={limits[key]} onChange={e => setLimits({ ...limits, [key]: Number(e.target.value) })}/>
         </label>)}<p className="help">{t("Expired questions are archived before hourly removal. Backups are retained separately.")}</p>
     <button className="secondary" disabled={busy} onClick={() => act('limits', { text: JSON.stringify(limits) })}>{t("Save limits")}</button>
-    </details>
+    </details>}
+ {state.hosted&&<HostedTools state={state} busy={busy} inSpin={inSpin} act={act}/>}
  <details>
     <summary>{t("Public reply history \u00B7 ")}{state.replyLog?.length || 0}</summary>{state.replyLog?.slice().reverse().map((row, i) => <article className="original" key={i}>
         <small>{formatDate(new Date(row.at))} · {row.user} · {t(row.status)}</small>

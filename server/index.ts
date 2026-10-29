@@ -2,7 +2,7 @@ import './session-types.js';
 import 'dotenv/config';
 import {extensionRouter,extensionPreviewRouter} from '../extension/server/router.js';
 import { settings, retain, bindBudget } from './limits.js';
-import {questionPresentation,presentedSpin} from './presentation.js';
+import {questionPresentation,presentedSpin,questionReadiness} from './presentation.js';
 import {TranslationWork} from './translation.js';
 import { Repository, PersistentSessions } from './storage.js';
 import { timedFetch } from './http.js';
@@ -11,11 +11,12 @@ import session from 'express-session';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
 import { z } from 'zod';
-import { addQuestion, demoState, emptyState, merge, split, spin, support, eligibleEntries, type State, type User, rememberAnswer, answerIsActive } from './domain.js';
+import { cleanupAnswerTranslations, addQuestion, approveQuestion, demoState, emptyState, merge, split, spin, support, eligibleEntries, type State, type User, rememberAnswer, answerIsActive } from './domain.js';
 import { QuestionWork } from './work.js';
 import { groupBatch, detectQuestions } from './ai.js';
 import { extractChatQuestion } from './chat.js';
 import { ApprovedReplies } from './replies.js';
+import { ApprovedAnswerTranslations } from './answer-translations.js';
 import { archiveSession, clearCollection } from './reset.js';
 import { TwitchConnection, type Credentials } from './twitch.js';
 const origin = process.env.APP_URL || 'http://localhost:3000';
@@ -43,20 +44,21 @@ repository.putSecret('obs', obsTokens);
 const persist = () => repository.save(real);
 bindBudget(real, persist);
 let twitch: TwitchConnection | undefined;
+const answerTranslator = new ApprovedAnswerTranslations(real, persist);
 const replies = new ApprovedReplies(() => real, async (message, parentId) => {
     if (!twitch)
         throw new Error('Twitch is disconnected.');
     await twitch.sendChatMessage(message, parentId);
-}, () => twitch?.status === 'Connected' && twitch.canWriteChat, persist);
+}, () => twitch?.status === 'Connected' && twitch.canWriteChat, persist, (group,questionText)=>answerTranslator.request({groupId:group.id,language:'detect',questionText}));
 setInterval(() => { void replies.flush().catch(() => { replies.status = 'Reply persistence failed — inspect storage'; }); }, 2000);
-const work = new QuestionWork(real, persist, messages => detectQuestions(messages, real), ids => groupBatch(real, ids), (group, user, messageId) => { replies.enqueue(group, user, messageId); });
+const work = new QuestionWork(real, persist, messages => detectQuestions(messages, real), ids => groupBatch(real, ids), (group, user, messageId, questionText) => { replies.enqueue(group, user, messageId, Date.now(), questionText); });
 persist();
 const translator=new TranslationWork(real,persist);
 const enqueue = (id: string) => work.enqueue(id);
 const locked = (s: State) => !!s.spin && s.spin.end > Date.now();
 setInterval(() => {
     if (!locked(real) && !work.busy && !translator.busy && process.env.OPENAI_API_KEY)
-        void (async()=>{await work.tick();await translator.tick();for(const [language,at] of extensionDemands){if(Date.now()-at>60000){extensionDemands.delete(language);continue;}if(language!==real.questionLanguage)await translator.tick(Date.now(),language);}})().catch(()=>{work.status='Processing failed; retained for retry';});
+        void (async()=>{await work.tick();await translator.tick();for(const [language,at] of extensionDemands){if(Date.now()-at>60000){extensionDemands.delete(language);continue;}if(language!==real.questionLanguage)await translator.tick(Date.now(),language);}for(const job of real.replyJobs||[])answerTranslator.request({groupId:job.groupId,language:'detect',questionText:job.questionText});for(const language of new Set([real.questionLanguage,...extensionDemands.keys()]))if(language&&language!=='original')for(const group of real.groups)if(answerIsActive(real,group))answerTranslator.request({groupId:group.id,language});await answerTranslator.tick();})().catch(()=>{work.status='Processing failed; retained for retry';});
 }, 2500);
 function ingest(user: User, text: string, messageId?: string) {
     if (messageId&&(process.env.OPENAI_API_KEY||extractChatQuestion(text)))
@@ -171,7 +173,7 @@ app.use('/api', (req, res, next) => {
 });
 app.get('/api/state', (req, res) => {
     const s = stateFor(req), controller = isController(req), id = req.session.user!.id;
-    res.json({ ...s,spin:presentedSpin(s),translationStatus:translator.status, replyHistory: undefined, replyJobs: undefined, replyLog: controller ? s.replyLog : undefined, aiJobs: undefined, pendingMessages: undefined, settings: controller ? settings(s) : undefined, aiBudget: controller ? s.aiBudget : undefined, entries: controller ? eligibleEntries(s) : undefined, groups: s.groups.map(g => ({ ...g, text:questionPresentation(s,g).text,title:questionPresentation(s,g).title,displayLanguage:s.questionLanguage||'original',originalText:g.text,originalTitle:g.customTitle||g.text,translationPending:questionPresentation(s,g).pending,translations:undefined,translationAttempts:undefined,supporters: undefined, answerHistory: controller ? g.answerHistory : undefined, embedding: undefined, aiProcessed: controller ? g.aiProcessed : undefined, answerActive: answerIsActive(s, g), count: support(g), questions: controller ? g.questions : g.questions.filter(q => q.user.id === id), review: controller ? g.review : undefined, answer: (controller || (answerIsActive(s, g) && g.questions.some(q => q.user.id === id))) ? g.answer : '' })), participants: controller ? s.participants : s.participants.filter(p => p.id === id), obsUrl: controller ? `${origin}/obs?token=${req.session.demo ? obsTokens.demo : obsTokens.real}` : undefined, serverTime: Date.now() });
+    res.json({ ...s,spin:presentedSpin(s),translationStatus:translator.status, answerTranslationJobs:undefined,approvedAnswerTranslations:undefined,answerLanguageCache:undefined,questionRates:undefined,replyHistory: undefined, replyJobs: undefined, replyLog: controller ? s.replyLog : undefined, aiJobs: undefined, pendingMessages: undefined, settings: controller ? settings(s) : undefined, aiBudget: controller ? s.aiBudget : undefined, entries: controller ? eligibleEntries(s) : undefined, groups: s.groups.map(g => ({ ...g, readiness:questionReadiness(s,g,!!process.env.OPENAI_API_KEY), text:questionPresentation(s,g).text,title:questionPresentation(s,g).title,displayLanguage:s.questionLanguage||'original',originalText:g.text,originalTitle:g.customTitle||g.text,translationPending:questionPresentation(s,g).pending,translations:undefined,translationAttempts:undefined,supporters: undefined, answerHistory: controller ? g.answerHistory : undefined, embedding: undefined, aiProcessed: controller ? g.aiProcessed : undefined, answerActive: answerIsActive(s, g), count: support(g), questions: controller ? g.questions : g.questions.filter(q => q.user.id === id), review: controller ? g.review : undefined, answer: (controller || (answerIsActive(s, g) && g.questions.some(q => q.user.id === id))) ? g.answer : '' })), participants: controller ? s.participants : s.participants.filter(p => p.id === id), obsUrl: controller ? `${origin}/obs?token=${req.session.demo ? obsTokens.demo : obsTokens.real}` : undefined, serverTime: Date.now() });
 });
 app.get('/api/overlay', (req, res) => {
     const token = req.query.token;
@@ -233,6 +235,8 @@ app.post('/api/action', (req, res) => {
             if (!s.participants.some(p => p.id === user.id))
                 s.participants.push({ ...user, selected: false });
             break;
+        case 'approve-question':
+            approveQuestion(s,action.id!);break;
         case 'leave':
             s.participants = s.participants.filter(p => p.id !== user.id);
             break;
@@ -336,6 +340,7 @@ app.post('/api/action', (req, res) => {
             if (!s.demo)
                 repository.snapshot(real);
             s.liveSession = randomBytes(12).toString('hex');
+            cleanupAnswerTranslations(s,'new-session');
             s.usage = { calls: 0, input: 0, output: 0 };
             s.aiBudget = { calls: 0, tokens: 0 };
             if (!s.demo)
@@ -351,7 +356,7 @@ app.post('/api/action', (req, res) => {
         case 'ui-language': s.uiLanguage=z.enum(['en','es','ru','de']).parse(action.value);break;
         case 'question-language': if(!s.demo&&!process.env.OPENAI_API_KEY&&action.value!=='original')throw new Error('Configure OpenAI to translate questions.');s.questionLanguage=z.enum(['original','en','es','ru','de']).parse(action.value);if(!s.demo)translator.retry();break;
         case 'reprocess':
-            if(!s.demo){work.retry();translator.retry();}
+            if(!s.demo){work.retry();translator.retry();answerTranslator.retry();}
             break;
         case 'disconnect':
             if (user.id !== process.env.TWITCH_BROADCASTER_ID && !s.demo)

@@ -1,6 +1,6 @@
 import {seedDemoTranslations} from './demoTranslations.js';
 import {questionPresentation,type QuestionLanguage,type QuestionTranslation} from './presentation.js';
-import { randomInt, randomUUID } from 'node:crypto';
+import { createHash, randomInt, randomUUID } from 'node:crypto';
 export type User = {
     id: string;
     name: string;
@@ -96,6 +96,7 @@ export type State = {
     }[];
     repliesPaused?: boolean;
     replyJobs?: {
+        questionText?: string;
         groupId: string;
         userId: string;
         messageId: string;
@@ -228,4 +229,32 @@ export function demoState() {
     seedDemoTranslations(s.groups);
     s.participants = ['pixelpilot', 'lunarose', 'cozycat', 'mintbyte', 'orbit'].map(name => ({ id: `sample-${name}`, name, selected: false }));
     return s;
+}
+
+// A deliberate owner review may bypass model grouping, never the selected translation.
+export function approveQuestion(s:State,id:string){
+ const group=s.groups.find(g=>g.id===id);
+ if(!group||group.status!=='pending')throw Error('Choose a pending question.');
+ group.aiProcessed=true;delete group.review;
+ s.aiJobs=s.aiJobs?.filter(job=>job.id!==id);
+}
+
+/** Drop derived answer text and work that no longer belongs to active content.
+ * This never changes the approved originals or previously created backups. */
+export function cleanupAnswerTranslations(s:State,mode:'prune'|'clear'|'new-session'='prune'){
+ const data=s as State&{answerTranslationJobs?:{groupId:string;source:string;questionText?:string}[];approvedAnswerTranslations?:Record<string,{source:string}>;answerLanguageCache?:Record<string,unknown>};
+ const before=JSON.stringify([data.answerTranslationJobs,data.approvedAnswerTranslations,data.answerLanguageCache]);
+ if(mode==='clear'){
+  delete data.answerTranslationJobs;delete data.approvedAnswerTranslations;delete data.answerLanguageCache;
+ }else{
+  const hash=(text:string)=>createHash('sha256').update(text).digest('hex');
+  const active=new Map(s.groups.filter(g=>answerIsActive(s,g)).map(g=>[g.id,hash(g.answer)]));
+  const sources=new Set(active.values());
+  if(data.answerTranslationJobs)data.answerTranslationJobs=mode==='new-session'?[]:data.answerTranslationJobs.filter(j=>active.get(j.groupId)===j.source);
+  if(data.approvedAnswerTranslations)for(const [key,value]of Object.entries(data.approvedAnswerTranslations))if(!sources.has(value.source))delete data.approvedAnswerTranslations[key];
+  const questions=new Set(s.groups.flatMap(g=>g.questions.map(q=>hash(q.text.trim()))));
+  for(const job of data.answerTranslationJobs||[])if(job.questionText)questions.add(hash(job.questionText.trim()));
+  if(data.answerLanguageCache)for(const key of Object.keys(data.answerLanguageCache))if(mode==='new-session'||!questions.has(key))delete data.answerLanguageCache[key];
+ }
+ return before!==JSON.stringify([data.answerTranslationJobs,data.approvedAnswerTranslations,data.answerLanguageCache]);
 }

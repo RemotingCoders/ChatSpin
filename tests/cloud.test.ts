@@ -94,7 +94,7 @@ test('Hosted worker persists provider failures and releases the channel after fa
  try{
   await repository.mutate('101',state=>{addQuestion(state,{id:'7',name:'Viewer'},'Que estas haciendo?');state.questionLanguage='en';state.cloudMaintenance=Date.now();});
   const failure=async(state:ReturnType<typeof emptyState>)=>{reserveAI(state,100);await flushBudget(state);throw Object.assign(Error('private provider message'),{status:401});};
-  await processCloudChannel(repository,'101',{group:async state=>failure(state),translate:async(_items,_language,state)=>failure(state)});
+  await processCloudChannel(repository,'101',{reserve:async()=>{},group:async state=>failure(state),translate:async(_items,_language,state)=>failure(state)});
   const {state}=await repository.load('101');assert.equal(state.aiBudget?.calls,2);assert.equal(state.usage.calls,0);assert.equal(state.cloudLease,undefined);
   assert.match(state.cloudStatus!.ai,/authentication failed/);assert.match(state.cloudStatus!.translation,/authentication failed/);
   assert.equal(state.groups[0].text,'Que estas haciendo?');assert.equal(state.groups[0].translations?.en,undefined);

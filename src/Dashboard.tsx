@@ -1,4 +1,5 @@
 import {useI18n} from './i18n';
+import {readinessLabel,needsManualReview} from './questionReadiness';
 import type { Spin } from '../server/domain';
 import type { ViewState, ViewGroup, Session, Act } from './types';
 import { Wheel } from './Wheel';
@@ -84,6 +85,7 @@ export function Dashboard({ state, presentation, entries, clock, inSpin, busy, a
             <span className="question-number">{String(i + 1).padStart(2, '0')}</span>
             <button className="question-text" onClick={() => showGroup(g)}>
             <strong>{g.title}</strong>
+            {g.status==='pending'&&g.readiness&&<small role="status">{t(readinessLabel[g.readiness])}</small>}
             <small>{g.questions[0]?.user.name} <span>·</span> {g.status === 'pending' ? g.review ? t("Needs review") : t("{v0} original{v1}", { v0: g.questions.length, v1: g.questions.length === 1 ? '' : 's' }) : g.status === 'written' ? g.answerActive === false ? t("Answer expired \u2014 review before reuse") : t("Written answer available") : t("Answered live \u00B7 no saved text")}</small>
             </button>
             <span className="support-count" title={t("{v0} unique {v1}", { v0: g.count, v1: g.count === 1 ? 'supporter' : t("supporters") })} aria-label={t("{v0} unique {v1}", { v0: g.count, v1: g.count === 1 ? 'supporter' : t("supporters") })}>
@@ -92,7 +94,7 @@ export function Dashboard({ state, presentation, entries, clock, inSpin, busy, a
             <path d="M3 21v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M18 15a5 5 0 0 1 3 4v2"/>
             </svg>
             <strong>{g.count}</strong>
-            </span>{g.status === 'pending' && <button className="spotlight-button" disabled={inSpin || busy} onClick={() => act('spin', { id: g.id })}>{t("Spotlight \u2197")}</button>}</div>)}{!groups.some(g => (filter === 'all' || (filter === 'pending' ? g.status === 'pending' : g.status !== 'pending')) && (g.text + g.title).toLowerCase().includes(search.toLowerCase())) && <p className="empty">{t("No questions here yet. Ask a question in Twitch chat; no command is needed.")}</p>}</div>
+            </span>{session.controller&&needsManualReview(g.readiness)&&<button className="secondary" disabled={inSpin||busy} title={t('Approve this as a new question after checking previous answers.')} onClick={()=>act('approve-question',{id:g.id})}>{t('Approve question')}</button>}{g.status === 'pending' && <button className="spotlight-button" disabled={inSpin || busy || !state.entries?.some(entry=>entry.id===g.id)} onClick={() => act('spin', { id: g.id })}>{t("Spotlight \u2197")}</button>}</div>)}{!groups.some(g => (filter === 'all' || (filter === 'pending' ? g.status === 'pending' : g.status !== 'pending')) && (g.text + g.title).toLowerCase().includes(search.toLowerCase())) && <p className="empty">{t("No questions here yet. Ask a question in Twitch chat; no command is needed.")}</p>}</div>
         </> : <div className="question-list">{state.participants.map(p => <div className="question-row" key={p.id}>
             <span className="avatar small">{p.name[0].toUpperCase()}</span>
             <strong>{p.name}</strong>

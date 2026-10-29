@@ -1,5 +1,6 @@
 import { answerIsActive, type Group, type State, type User } from './domain.js';
 type ReplyJob = {
+    questionText?: string;
     groupId: string;
     userId: string;
     messageId: string;
@@ -37,8 +38,8 @@ export class ApprovedReplies {
     }
     private busy = false;
     get isSending(){return this.busy;}
-    constructor(private state: () => State, private send: (message: string, parentId: string) => Promise<void>, private ready: () => boolean, private persist: () => void) { }
-    enqueue(group: Group, user: User, messageId?: string, now = Date.now()) {
+    constructor(private state: () => State, private send: (message: string, parentId: string) => Promise<void>, private ready: () => boolean, private persist: () => void, private translate?: (group:Group,questionText?:string)=>{status:'ready';text:string}|{status:'pending'}|{status:'failed';reason:string}) { }
+    enqueue(group: Group, user: User, messageId?: string, now = Date.now(), questionText?:string) {
         if (!messageId || !answerIsActive(this.state(), group))
             return false;
         const state = this.state();
@@ -56,7 +57,7 @@ export class ApprovedReplies {
         history[key] = now;
         for (const old of Object.keys(history).sort((a, b) => history[b] - history[a]).slice(2000))
             delete history[old];
-        const job = { groupId: group.id, userId: user.id, messageId, answer: group.answer, parts, next: 0, created: now };
+        const job = { questionText, groupId: group.id, userId: user.id, messageId, answer: group.answer, parts, next: 0, created: now };
         this.jobs.push(job);
         this.log(job, 'Queued');
         this.status = 'Approved reply queued';
@@ -81,6 +82,14 @@ export class ApprovedReplies {
                 this.jobs.shift();
                 this.log(job, 'Cancelled or expired');
                 continue;
+            }
+            if(this.translate&&job.next===0){
+                const translated=this.translate(group,job.questionText);
+                if(translated.status==='pending'){this.status='Translating approved reply';return;}
+                if(translated.status==='failed'){this.jobs.shift();this.log(job,'Reply withheld — '+translated.reason);continue;}
+                const recipient=job.parts[0]?.match(/^@([A-Za-z0-9_]+) /)?.[1];
+                if(!recipient){this.jobs.shift();this.log(job,'Reply withheld — missing recipient');continue;}
+                job.parts=approvedReplyParts({id:job.userId,name:recipient},translated.text);
             }
             if (!this.ready()) {
                 this.status = 'Reconnect Twitch to send queued replies';
