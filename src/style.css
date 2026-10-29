@@ -233,6 +233,10 @@ nav a.active {
   width: calc(100% - 232px);
 }
 header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #101015;
   height: 77px;
   border-bottom: 1px solid #28262f;
   display: flex;
