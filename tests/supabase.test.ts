@@ -66,3 +66,24 @@ test('Cloud sessions expire and durable inboxes stay isolated by channel',async(
  await repository.load('101');await repository.putSecret('101','inbox:message',{text:'Question?'});
  assert.equal((await repository.inbox('101')).length,1);assert.equal((await repository.inbox('202')).length,0);
 });
+
+test('Extension state responds while a translation-demand write is stalled and skips recent demands',async()=>{
+ const {repository}=database();await repository.load('101');
+ await repository.mutate('101',s=>{s.questionLanguage='en';addQuestion(s,{id:'7',name:'Viewer'},'Where are you from?');});
+ const secret=randomBytes(32).toString('base64'),head=Buffer.from(JSON.stringify({alg:'HS256'})).toString('base64url'),payload=Buffer.from(JSON.stringify({channel_id:'101',role:'viewer',opaque_user_id:'U7',user_id:'7',exp:Date.now()/1000+300})).toString('base64url'),data=head+'.'+payload;
+ const token=data+'.'+createHmac('sha256',Buffer.from(secret,'base64')).update(data).digest('base64url');
+ const originalMutate=repository.mutate.bind(repository);let release!:()=>void,writes=0;
+ const stalled=new Promise<void>(resolve=>{release=resolve;});
+ repository.mutate=(async(...args:Parameters<typeof originalMutate>)=>{writes++;await stalled;return originalMutate(...args);}) as typeof repository.mutate;
+ const background:Promise<unknown>[]=[];let scheduled=0;
+ const app=express();app.use('/extension-api',cloudExtensionRouter({repository,clientId:'extension',secrets:[secret],background:p=>{background.push(p);},schedule:()=>{scheduled++;}}));
+ const server=app.listen(0,'127.0.0.1');await new Promise<void>(resolve=>server.once('listening',resolve));
+ const url='http://127.0.0.1:'+(server.address() as {port:number}).port+'/extension-api/state';
+ const read=()=>fetch(url,{headers:{Authorization:'Bearer '+token,Origin:'https://extension.ext-twitch.tv'},signal:AbortSignal.timeout(2000)});
+ try{
+  const response=await read();assert.equal(response.status,200);assert.equal((await response.json()).groups.length,1);
+  assert.equal(writes,1);assert.equal(scheduled,0);
+  release();await Promise.all(background);assert.equal(scheduled,1);
+  assert.equal((await read()).status,200);assert.equal(writes,1);assert.equal(scheduled,2);
+ }finally{release();await Promise.allSettled(background);server.close();server.closeAllConnections();}
+});

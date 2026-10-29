@@ -15,7 +15,12 @@ import {languageSchema} from '../extension/server/service.js';
 
 export function createCloudApp(repository:SupabaseRepository,origin:string,secret:string,background:(promise:Promise<unknown>)=>void=waitUntil){
  const app=express();app.disable('x-powered-by');app.set('trust proxy',1);
- const schedule=(channel:string)=>background(processCloudChannel(repository,channel).catch(error=>{console.error(error instanceof CloudProcessingError?error.message:'ChatSpin background processing failed; work remains persisted for retry.');}));
+ const running=new Set<string>();
+ const schedule=(channel:string)=>{
+  if(running.has(channel))return;
+  running.add(channel);
+  background(processCloudChannel(repository,channel).catch(error=>{console.error(error instanceof CloudProcessingError?error.message:'ChatSpin background processing failed; work remains persisted for retry.');}).finally(()=>running.delete(channel)));
+ };
  app.use((req,res,next)=>{res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','no-referrer');next();});
  app.get('/api/cron',async(req,res)=>{
   const cron=process.env.CRON_SECRET;if(!cron||req.get('authorization')!=='Bearer '+cron)return res.sendStatus(403);
@@ -26,7 +31,7 @@ export function createCloudApp(repository:SupabaseRepository,origin:string,secre
  });
  app.get('/api/health',(_req,res)=>res.json({ok:true,service:'ChatSpin cloud',storage:'Supabase',multiChannel:true}));
  app.use(cloudWebhooks(repository,secret,schedule));
- app.use('/extension-api',cloudExtensionRouter({repository,clientId:process.env.EXTENSION_CLIENT_ID||'',secrets:[process.env.EXTENSION_SECRET||'',process.env.EXTENSION_PREVIOUS_SECRET||''],origins:(process.env.EXTENSION_ALLOWED_ORIGINS||'').split(',').map(s=>s.trim()).filter(Boolean),schedule}));
+ app.use('/extension-api',cloudExtensionRouter({repository,clientId:process.env.EXTENSION_CLIENT_ID||'',secrets:[process.env.EXTENSION_SECRET||'',process.env.EXTENSION_PREVIOUS_SECRET||''],origins:(process.env.EXTENSION_ALLOWED_ORIGINS||'').split(',').map(s=>s.trim()).filter(Boolean),schedule,background}));
  app.use(express.json({limit:'8kb'}));
  app.use(cloudAuthentication(repository,origin,secret));
  app.use((req,res,next)=>{if(req.method!=='GET'&&req.headers.origin!==origin)return res.status(403).json({error:'Request origin rejected.'});next();});

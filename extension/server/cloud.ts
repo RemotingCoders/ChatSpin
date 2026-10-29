@@ -5,7 +5,7 @@ import {extensionState,applyExtensionAction,languageSchema,type ExtensionActor} 
 import {SupabaseRepository,StateConflict,ChannelBusy} from '../../server/supabase.js';
 import type {State,User} from '../../server/domain.js';
 
-export type CloudExtensionOptions={repository:SupabaseRepository;clientId:string;secrets:string[];origins?:string[];schedule?:(channel:string)=>void};
+export type CloudExtensionOptions={repository:SupabaseRepository;clientId:string;secrets:string[];origins?:string[];schedule?:(channel:string)=>void;background?:(promise:Promise<unknown>)=>void};
 export function cloudExtensionRouter(options:CloudExtensionOptions){
  const router=express.Router(),origins=[`https://${options.clientId}.ext-twitch.tv`,...(options.origins||[])];
  router.use((req,res,next)=>{
@@ -30,11 +30,15 @@ export function cloudExtensionRouter(options:CloudExtensionOptions){
   return {controller,user:id?(known||{id,name:'Viewer '+id}):undefined,anonymous:c.opaque_user_id.startsWith('A')};
  }
  router.get('/state',async(req,res)=>{
-  const c=res.locals.claims as ExtensionClaims,{state}=await options.repository.load(c.channel_id);
-  const configured=await options.repository.getSecret<typeof state.questionLanguage>(c.channel_id,'question-language');if(configured)state.questionLanguage=configured;
+  const c=res.locals.claims as ExtensionClaims;
+  const [{state},configured]=await Promise.all([options.repository.load(c.channel_id),options.repository.getSecret<State['questionLanguage']>(c.channel_id,'question-language')]);if(configured)state.questionLanguage=configured;
   const language=languageSchema.parse(req.query.language||state.questionLanguage||'original');
-  if(language!=='original')try{await options.repository.mutate(c.channel_id,s=>{s.cloudTranslations||={};s.cloudTranslations[language]=Date.now();});}catch(error){if(!(error instanceof ChannelBusy)&&!(error instanceof StateConflict))throw error;}
-  res.json(extensionState(state,actor(state,c),language));options.schedule?.(c.channel_id);
+  res.json(extensionState(state,actor(state,c),language));
+  // Reading the wheel must not wait for a translation-demand write or an AI lease.
+  if(language!=='original'&&(state.cloudTranslations?.[language]||0)<Date.now()-30000){
+   const demand=options.repository.mutate(c.channel_id,s=>{s.cloudTranslations||={};s.cloudTranslations[language]=Date.now();}).catch(error=>{if(!(error instanceof ChannelBusy)&&!(error instanceof StateConflict))console.error('ChatSpin translation demand could not be saved.');}).finally(()=>options.schedule?.(c.channel_id));
+   options.background?.(demand);
+  }else options.schedule?.(c.channel_id);
  });
  router.post('/action',async(req,res)=>{
   const c=res.locals.claims as ExtensionClaims;
