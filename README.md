@@ -61,7 +61,7 @@ OpenAI API usage requires your own API configuration and billing; a ChatGPT or C
 9. Copy **OBS link** into an OBS Browser Source (suggested 1280×900). Keep its token private. It exposes the spin snapshot, eligible entry titles/weights, mode, and simulated-data flag, with no control endpoints. Spin again and verify identical result and animation. The OBS link persists across restarts. **Regenerate OBS link** explicitly invalidates the old one.
 10. Temporarily interrupt connectivity. The dashboard reflects reconnecting; the server retries closed sockets and uses Twitch's reconnect URL for session migration. Tokens refresh before subscription as necessary and validate hourly. Revoked credentials require reconnection. Use **Disconnect** to stop ingestion.
 
-Moderators are authorized using `MODERATOR_IDS`, not names or client-submitted roles. They sign in through Viewer space and open the dashboard after authentication. This version intentionally uses an explicit operator allowlist instead of requesting Twitch moderation scopes.
+In local mode, moderators are authorized using `MODERATOR_IDS`, not names or client-submitted roles. They sign in through Viewer space and open the dashboard after authentication. This version intentionally uses an explicit operator allowlist instead of requesting Twitch moderation scopes.
 
 ## Grouping, selection, and corrections
 
@@ -87,7 +87,7 @@ Browser sessions and Twitch credentials are encrypted with AES-256-GCM using a k
 
 Messages are capped at 500 characters; written answers at 2,000. Web input is limited to 30 actions per user per minute. The AI inbox and grouping queue each hold at most 100 entries and are processed serially. Jobs persist across restart and retry up to three times with backoff; **Reprocess open questions** retries exhausted jobs. Per-viewer Twitch intake is capped at ten messages per minute and web actions at thirty. Candidate retrieval is intentionally bounded and may miss multilingual matches, especially on large channels. There is no automatic semantic evaluation without credentials, and live Twitch permissions/reconnection still require verification with your account. An OBS link is a bearer capability: anyone possessing it can see the current presentation, but cannot control it. Anyone visiting Viewer space must authenticate, even to submit a question.
 
-No audio capture, transcription, generated answers, calls, payments, betting, or Twitch Extension are included. Public chat replies reuse approved written answers only.
+No audio capture, transcription, independently generated answers, calls, payments, or betting are included. An optional Twitch Extension is included, with panel, overlay and mobile views. Public chat replies use approved written answers, translated when AI is configured; the approved source is preserved.
 
 ## Hackathon delivery
 
@@ -130,7 +130,7 @@ In **Review & answer**, the fixed bottom action bar has one **Mark answered** bu
 
 ## Automatic approved-answer replies
 
-Replies are sent from the connected broadcaster account. The server sends at most one message part every two seconds, suppresses repeats to the same user and question for one minute, and retains that cooldown across restarts. Answers longer than Twitch’s message limit are split without rewriting. The queue holds at most 50 answers and expires jobs after five minutes; edited, reopened, or cleared answers invalidate queued replies. Failed or moderation-held messages are reported in the dashboard and are not automatically retried. No generated answer is posted. Tests use mocked Twitch endpoints; verify live delivery after reconnecting with write permission.
+Replies are sent from the connected broadcaster account. The server sends at most one message part every two seconds, suppresses repeats to the same user and question for one minute, and retains that cooldown across restarts. Answers longer than Twitch’s message limit are split without rewriting. The queue holds at most 50 answers and expires jobs after five minutes; edited, reopened, or cleared answers invalidate queued replies. Failed or moderation-held messages are reported in the dashboard and are not automatically retried. The model translates approved content; it does not independently answer the viewer’s question. Tests use mocked Twitch endpoints; verify live delivery after reconnecting with write permission.
 
 ## Live session controls, budgets, and retention
 
@@ -151,9 +151,9 @@ Two independent settings are available:
 - **Interface language**, in the header: English, Español, Русский, or Deutsch. The browser remembers the choice. A streamer/controller change also saves the shared OBS interface language; viewers can choose their own interface locally.
 - **Question language**, under **Live session & automation → Language settings**: original, English, Spanish, Russian, or German. It controls question titles, the full spotlight question, the queue, and OBS. Originals remain available in the review dialog, and cross-language equivalence still uses original messages.
 
-Question translations use structured model output, are cached separately per language and source, and share the same AI call/token budget. When unavailable or pending, originals remain visible with a dashboard notice; questions are never dropped or answered by the translation model. Configure OpenAI before selecting a forced question language in a real workspace. Reprocessing retries exhausted translations. Changing the question language is blocked during an active draw; an already running animation retains its frozen labels until completion.
+Question translations use structured model output, are cached separately per language and source, and share the same AI call/token budget. When unavailable or pending, originals remain available in the review queue with a status notice. A forced-language wheel waits for a current translation and grouping/previous-answer checks before admitting a question; questions are retained for retry, not dropped or answered by the translation model. Configure OpenAI before selecting a forced question language in a real workspace. Reprocessing retries exhausted translations. Changing the question language is blocked during an active draw; an already running animation retains its frozen labels until completion.
 
-Editing a title in a forced language updates that language's display title without rewriting the original question or other languages. Editing the title in original mode changes the source title and invalidates stale translations. Approved written answers are not automatically translated or rewritten.
+Editing a title in a forced language updates that language's display title without rewriting the original question or other languages. Editing the title in original mode changes the source title and invalidates stale translations. Approved written answers remain stored unchanged. With OpenAI configured, public replies are translated into the language of the incoming question, and the extension displays answers in the viewer’s selected language. Translations are cached separately and may change wording to convey the approved answer, but must not invent new facts. Unsupported or failed translations are withheld with a status message. Without OpenAI, public replies send the original approved text.
 
 The labeled demo has prepared question translations in all four languages and makes no runtime model calls. UI catalogs are static, so changing interface language has no API cost. Developers can add missing UI strings with `node --import tsx scripts/generate-locales.ts`; this optional maintenance tool makes paid API calls with public UI strings only and preserves existing translations.
 

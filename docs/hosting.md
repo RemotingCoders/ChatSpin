@@ -4,11 +4,19 @@ This hosted backend is separate from `server/index.ts`, which retains the origin
 
 ## Database
 
-Run `supabase/migrations/202610280001_chatspin.sql` once as the existing database owner. It only creates `chatspin_` tables, indexes and a scoped commit function. It does not change other apps' tables or Supabase Auth settings. RLS denies browser `anon`/`authenticated` access; the backend's secret key has the service role. The secret key must never enter a public bundle. Supabase publishable/anon keys do not authorize this backend.
+Apply all migrations below **in this order**, as the existing database owner, before deploying the backend:
+
+1. [Initial ChatSpin schema](../supabase/migrations/202610280001_chatspin.sql): channel state, encrypted settings/sessions, backups and the commit function.
+2. [Conflict response correction](../supabase/migrations/202610290001_chatspin_conflict_code.sql): use `PT409` for revision conflicts so PostgREST does not retry the transaction indefinitely.
+3. [Hosted AI quotas](../supabase/migrations/202610290002_chatspin_ai_quotas.sql): daily quotas, channel entitlements and the atomic `chatspin_reserve_ai` function.
+
+**The quota migration is required even when `OPENAI_API_KEY` is already configured.** Without it, hosted AI requests fail closed before contacting the model. A successful frontend build or health check does not verify this migration. For an existing installation, apply any missing migrations in order; do not skip the quota migration.
+
+These migrations scope their changes to `chatspin_` objects; they do not modify other applications’ tables or Supabase Auth settings. RLS denies browser `anon`/`authenticated` access; the backend’s secret key has the service role. The secret key must never enter a public bundle. Supabase publishable/anon keys do not authorize this backend.
 
 State, AI/reply jobs and version counters are per channel. Tokens and web sessions are AES-GCM encrypted with a key derived from `SESSION_SECRET`. Keep this stable: changing it invalidates sessions and makes stored credentials unreadable. Cloud data is a fresh installation: existing local data is not silently uploaded or attributed to another channel. No automatic SQLite-to-cloud import is provided.
 
-Each update uses an atomic revision check. Workers acquire a durable, expiring per-channel lease, persisting reservations before paid AI calls and sending markers before public chat replies. Conflicting user actions receive 409 and can be retried; reads remain available. These leases are intentionally coarse for this first hosted version and can briefly block controls while AI is working. Chat events are durably recorded in a separate encrypted inbox so they do not wait for an AI lease.
+Each update uses an atomic revision check. Workers acquire a durable, expiring per-channel lease, persisting reservations before paid AI calls and sending markers before public chat replies. Conflicting user actions receive 409 and can be retried; reads remain available. The AI lease coordinates workers; interactive actions can commit while AI runs, and worker results are rebased against newer state. Genuine revision conflicts and spin locks still return 409 rather than silently overwriting changes. Chat events are durably recorded in a separate encrypted inbox so they do not wait for an AI lease.
 
 ## Production variables (Vercel, server-only)
 
@@ -32,13 +40,13 @@ Optional: `OPENAI_MODEL`, `OPENAI_EMBEDDING_MODEL`, `EXTENSION_PREVIOUS_SECRET`,
 
 The backend subscribes to `channel.chat.message` with webhook transport after broadcaster OAuth, requesting `user:read:chat user:write:chat user:bot channel:bot`. Existing local grants need a reconnect to authorize those additional scopes. Twitch signs the raw payload; signatures, timestamps and channel identity are checked. The callback verification endpoint is public HTTPS and must not be blocked by Vercel Deployment Protection or an interactive login challenge. The webhook secret is derived server-side; it requires no extra user-supplied variable.
 
-Work is triggered by incoming events/dashboard/extension requests using Vercel `waitUntil`. A minute-based cron retries queued work and runs retention/session cleanup without relying on a browser remaining open. Configure `CRON_SECRET` in Vercel before deployment. The configured minute schedule requires a plan supporting that frequency. Each cron invocation handles up to 20 channel records; this is an initial operational limit, not a high-scale multi-tenant scheduler. For a large hosted service, replace that sweep with a dedicated durable queue and fair scheduling before selling availability guarantees. Existing per-channel AI budgets are limits, not a commercial billing system or global organization spending cap.
+Work is triggered by incoming events/dashboard/extension requests using Vercel `waitUntil`. A minute-based cron retries queued work and runs retention/session cleanup without relying on a browser remaining open. Configure `CRON_SECRET` in Vercel before deployment. The configured minute schedule requires a plan supporting that frequency. Each cron invocation handles up to 20 channel records; this is an initial operational limit, not a high-scale multi-tenant scheduler. For a large hosted service, replace that sweep with a dedicated durable queue and fair scheduling before selling availability guarantees. Provider-controlled daily quotas apply both per channel and across the hosted service. They are stored outside session state, cannot be raised or reset by streamers, and reserve capacity before paid model calls. See [quota configuration and defaults](monetization.md). These allowances are not a payment or billing system.
 
 Public reply unknown outcomes are not retried automatically to avoid duplicates. External provider/API failures leave persisted jobs for bounded retry. No public pricing, billing, Bits purchases or subscription management is implemented. The open-source MIT license is unchanged.
 
 ## Verification after deployment
 
-1. `/api/health` should return JSON identifying the cloud backend. It is liveness, not proof of database credentials or migration correctness.
+1. Confirm all three database migrations above have been applied. Then `/api/health` should return JSON identifying the cloud backend. It is liveness, not proof of database credentials or migration correctness.
 2. Connect your Twitch account at `/auth/twitch`; the session and encrypted credentials must persist across reloads.
 3. Check Twitch webhook verification and a real incoming question. Check saved-answer reply delivery separately.
 4. Connect a second broadcaster and confirm isolated questions, answers, participants and draws.
