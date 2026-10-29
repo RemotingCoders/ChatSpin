@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { addQuestion, emptyState, support } from '../server/domain.ts';
-import { applyDecisions } from '../server/ai.ts';
+import { applyDecisions, retrieveCandidates } from '../server/ai.ts';
 test('A batch groups paraphrases from the same batch and resolves earlier merged IDs', () => {
   const s=emptyState(); const a=addQuestion(s,{id:'a',name:'A'},'How do I grow?'), b=addQuestion(s,{id:'b',name:'B'},'How to find viewers?'), c=addQuestion(s,{id:'c',name:'C'},'How to attract a community?');
   applyDecisions(s,[a,b,c],[],[{source:a.id,target:null,confidence:'different',title:'Growth'}, {source:b.id,target:a.id,confidence:'equivalent',title:'First viewers'},{source:c.id,target:b.id,confidence:'equivalent',title:'Community'}]);
@@ -58,4 +58,26 @@ test('Model-detected temporary questions cannot reuse an old written answer',()=
  const state=emptyState();const old=addQuestion(state,{id:'a',name:'A'},'Describe the project on your screen',undefined,Date.now()-1800000);old.status='written';old.answer='The earlier project';
  const fresh=addQuestion(state,{id:'b',name:'B'},'Which project are you showing?');
  applyDecisions(state,[fresh],[old],[{source:fresh.id,target:old.id,confidence:'equivalent',timeSensitive:true,title:'Current screen project'}]);assert.equal(state.groups.length,2);
+});
+
+
+test('Stable multilingual equivalents remain candidates and merge after five minutes', async () => {
+  const state=emptyState(), now=Date.now();
+  const old=addQuestion(state,{id:'a',name:'A'},'Where are you from?',undefined,now-1800000);
+  const fresh=addQuestion(state,{id:'b',name:'B'},'¿De qué país sos?',undefined,now);
+  const candidates=await retrieveCandidates(state,[fresh],[fresh.id]);
+  assert.ok(candidates.some(g=>g.id===old.id));
+  applyDecisions(state,[fresh],candidates,[{source:fresh.id,target:old.id,confidence:'equivalent',timeSensitive:false,title:'Country of origin'}]);
+  assert.equal(state.groups.length,1);
+  assert.deepEqual(old.questions.map(q=>q.text),['Where are you from?','¿De qué país sos?']);
+});
+
+test('Retrieval retains time boundaries for changing context, including written answers', async () => {
+  for(const status of ['pending','written'] as const){
+    const state=emptyState(), now=Date.now();
+    const old=addQuestion(state,{id:'a',name:'A'},'What are you doing?',undefined,now-1800000);
+    old.status=status;if(status==='written')old.answer='The earlier project';
+    const fresh=addQuestion(state,{id:'b',name:'B'},'What are you trying to do?',undefined,now);
+    assert.deepEqual(await retrieveCandidates(state,[fresh],[fresh.id]),[]);
+  }
 });

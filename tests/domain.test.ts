@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addQuestion, emptyState, merge, split, spin, support } from '../server/domain.ts';
+import { addQuestion as addRawQuestion, emptyState, merge, split, spin, support } from '../server/domain.ts';
 const alice = { id: '1', name: 'alice' }, bob = { id: '2', name: 'bob' };
 test('Duplicate messages and self-support count once using stable IDs', () => {
   const s = emptyState(), g = addQuestion(s, alice, 'How do you start?');
@@ -42,3 +42,5 @@ test('Participant draw is uniform and selected people are excluded', () => {
   const result = spin(s); assert.equal(result.winner,alice.id); assert.deepEqual(result.candidates.map(c=>c.weight),[1]);
   assert.throws(()=>spin(s,undefined,Date.now()+7000),/No eligible/); s.excludeSelected=false; assert.equal(spin(s,undefined,Date.now()+7000).candidates.length,2);
 });
+
+function addQuestion(...args: Parameters<typeof addRawQuestion>){const g=addRawQuestion(...args);g.aiProcessed=true;return g;}

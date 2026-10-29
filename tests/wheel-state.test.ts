@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addQuestion, emptyState, eligibleEntries, spin } from '../server/domain.ts';
+import { addQuestion as addRawQuestion, emptyState, eligibleEntries, spin } from '../server/domain.ts';
 import { wheelPresentation } from '../src/wheelState.ts';
 
 test('Pending questions appear before the first spin', () => {
@@ -36,3 +36,5 @@ test('Reopened, answered, weighted, and participant entries follow current eligi
   const view = wheelPresentation(eligibleEntries(state), draw, state.mode, Date.now());
   assert.equal(view.entries[0].id, 'guest'); assert.equal(view.spin, null);
 });
+
+function addQuestion(...args: Parameters<typeof addRawQuestion>){const g=addRawQuestion(...args);g.aiProcessed=true;return g;}

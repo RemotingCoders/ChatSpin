@@ -24,6 +24,8 @@ for(const [original,incoming,gap,expected] of [
  ['What are you doing?','What are you trying to do?',60000,true],
  ['What are you doing?','What are you trying to do?',1800000,false],
  ['Where are you from?','Where do you live?',60000,false],
+ ['Where are you from?','Which country are you from?',1800000,true],
+ ['Where are you from?','¿De qué país sos?',1800000,true],
  ['How do I reach out to brands?','How much should I charge brands?',60000,false],
 ] as const){
  const s=emptyState();const a=addQuestion(s,{id:'a',name:'A'},original,undefined,Date.now()-gap),b=addQuestion(s,{id:'b',name:'B'},incoming);

@@ -35,7 +35,7 @@ test('Viewer participation uses verified identity and never grants spin, answer 
  assert.throws(()=>applyExtensionAction(s,actor,{type:'ask',text:'Question?',user:{id:channel}},()=>{}));
 });
 test('Extension controllers operate the same shared draw and answer lifecycle',()=>{
- const s=emptyState(),g=addQuestion(s,{id:'99',name:'Viewer'},'Question?');const actor={controller:true,anonymous:false,user:{id:channel,name:'Owner'}};
+ const s=emptyState(),g=addQuestion(s,{id:'99',name:'Viewer'},'Question?');g.aiProcessed=true;const actor={controller:true,anonymous:false,user:{id:channel,name:'Owner'}};
  applyExtensionAction(s,actor,{type:'spotlight',id:g.id},()=>{});assert.equal(s.spin!.winner,g.id);
  applyExtensionAction(s,actor,{type:'answer',id:g.id,text:'Approved'},()=>{});assert.equal(g.status,'written');assert.equal(g.answer,'Approved');assert.equal(extensionState(s,{controller:false,anonymous:false,user:{id:'99',name:'Viewer'}},'original').groups[0].answer,'Approved');
 });
@@ -47,14 +47,14 @@ test('Extension HTTP API enforces JWT, channel, CORS and viewer permissions inde
   assert.equal((await call('/state')).status,401);assert.equal((await call('/state',jwt(claims()),undefined,'https://untrusted.example')).status,403);
   const response=await call('/state',jwt(claims()));assert.equal(response.status,200);assert.equal(response.headers.get('access-control-allow-origin'),origin);const data=await response.json();assert.equal(data.obsUrl,undefined);assert.equal(data.settings,undefined);
   assert.equal((await call('/action',jwt(claims()),{type:'spin'})).status,403);assert.equal((await call('/action',jwt(claims()),{type:'ask',text:'A question?'})).status,200);assert.equal(saves,1);
-  assert.equal((await call('/action',jwt(claims({role:'broadcaster',opaque_user_id:'U'+channel,user_id:channel})),{type:'spin'})).status,200);
+  s.groups.forEach(g=>g.aiProcessed=true);assert.equal((await call('/action',jwt(claims({role:'broadcaster',opaque_user_id:'U'+channel,user_id:channel})),{type:'spin'})).status,200);
   assert.equal((await call('/state',jwt(claims({channel_id:'54321'})))).status,401);
  }finally{await new Promise<void>(r=>server.close(()=>r()));}
 });
 
 test('Answer saving removes empty and written answers from the wheel by default, with explicit opt-out',()=>{
  for(const text of ['', 'Argentina'])for(const removeFromWheel of [undefined,true,false]){
-  const state=emptyState(),group=addQuestion(state,{id:'99',name:'Viewer'},'Where are you from?');
+  const state=emptyState(),group=addQuestion(state,{id:'99',name:'Viewer'},'Where are you from?');group.aiProcessed=true;
   const actor={controller:true,anonymous:false,user:{id:channel,name:'Owner'}};
   applyExtensionAction(state,actor,{type:'answer',id:group.id,text,...(removeFromWheel===undefined?{}:{removeFromWheel})},()=>{});
   const projected=extensionState(state,actor,'original');

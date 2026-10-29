@@ -6,7 +6,7 @@ export const languageSchema=z.enum(languages);
 export type ExtensionActor={user?:User;controller:boolean;anonymous:boolean};
 export function extensionState(s:State,actor:ExtensionActor,language:QuestionLanguage){
  const presentation=(id:string)=>{const g=s.groups.find(g=>g.id===id);return g?questionPresentation({...s,questionLanguage:language},g):undefined;};
- const entries=eligibleEntries(s).map(e=>({...e,label:s.mode==='questions'?presentation(e.id)?.title||e.label:e.label}));
+ const entries=eligibleEntries(s).filter(e=>s.mode!=='questions'||!presentation(e.id)?.pending).map(e=>({...e,label:s.mode==='questions'?presentation(e.id)?.title||e.label:e.label}));
  const draw=s.spin?{...s.spin,candidates:s.spin.candidates.map(e=>({...e,label:s.spin!.mode==='questions'?presentation(e.id)?.title||e.label:e.label})),...(s.spin.mode==='questions'?{text:presentation(s.spin.winner)?.text||s.spin.text,label:presentation(s.spin.winner)?.title||s.spin.label}:{})}:null;
  return {controller:actor.controller,canParticipate:!!actor.user,anonymous:actor.anonymous,user:actor.user||null,demo:s.demo,mode:s.mode,odds:s.odds,registration:s.registration,excludeSelected:s.excludeSelected,entries,spin:draw,serverTime:Date.now(),uiLanguage:s.uiLanguage||'en',questionLanguage:language,participantCount:s.participants.length,joined:!!actor.user&&s.participants.some(p=>p.id===actor.user!.id),groups:s.groups.map(g=>{
   const display=questionPresentation({...s,questionLanguage:language},g);const own=!!actor.user&&g.questions.some(q=>q.user.id===actor.user!.id);

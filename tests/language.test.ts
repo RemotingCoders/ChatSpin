@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {addQuestion,demoState,emptyState,eligibleEntries,spin} from '../server/domain.ts';
+import {addQuestion as addRawQuestion,demoState,emptyState,eligibleEntries,spin} from '../server/domain.ts';
 import {questionPresentation,presentedSpin,translationSource} from '../server/presentation.ts';
 import {TranslationWork} from '../server/translation.ts';
 
@@ -27,3 +27,5 @@ test('Translation failures preserve originals and retry with a bounded persisted
  const worker=new TranslationWork(s,()=>{},async()=>{calls++;throw Error('Offline');});await worker.tick(1000);await worker.tick(1001);assert.equal(calls,1);assert.equal(g.translationAttempts!.ru!.attempts,1);assert.equal(questionPresentation(s,g).text,g.text);
  worker.retry();assert.deepEqual(g.translationAttempts,{});
 });
+
+function addQuestion(...args: Parameters<typeof addRawQuestion>){const g=addRawQuestion(...args);g.aiProcessed=true;return g;}

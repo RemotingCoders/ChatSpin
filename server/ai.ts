@@ -54,7 +54,7 @@ export function applyDecisions(s: State, incoming: Group[], candidates: Group[],
             continue;
         if (target.status === 'written' && !answerIsActive(s, target))
             continue;
-        if ((target.status === 'pending' || target.contextual || source.contextual) && contextSpan([source, target]) > CONTEXT_WINDOW_MS)
+        if ((target.contextual || source.contextual) && contextSpan([source, target]) > CONTEXT_WINDOW_MS)
             continue;
         if (decision.confidence === 'contextual') {
             if (source.status === 'pending' && target.status === 'pending' && contextSpan([source, target]) <= CONTEXT_WINDOW_MS) {
@@ -104,7 +104,9 @@ export function cosine(a: number[], b: number[]) {
     return x && y ? dot / Math.sqrt(x * y) : 0;
 }
 export async function retrieveCandidates(s: State, incoming: Group[], ids: string[]) {
-    const eligible = s.groups.filter(g => !ids.includes(g.id) && (g.status === 'pending' ? incoming.some(source => contextSpan([source, g]) <= CONTEXT_WINDOW_MS) : g.status === 'live' || answerIsActive(s, g)));
+    // Stable questions remain candidates regardless of age. The five-minute guard
+    // applies to changing context, not every unanswered question in the queue.
+    const eligible = s.groups.filter(g => !ids.includes(g.id) && (g.status === 'pending' || g.status === 'live' || answerIsActive(s, g)) && incoming.some(source => !(source.contextual || g.contextual) || contextSpan([source, g]) <= CONTEXT_WINDOW_MS));
     if (eligible.length <= 30)
         return eligible;
     const model = process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small';
