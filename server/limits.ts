@@ -1,8 +1,10 @@
 import type { State } from './domain.ts';
 export const defaults = { aiCallLimit: 200, aiTokenLimit: 200000, retentionDays: 30, maxGroups: 2000 };
 export function settings(s: State) { return { ...defaults, ...s.settings }; }
+const budgetFlushers = new WeakMap<State, () => Promise<void>>();
+export async function flushBudget(state: State) { await budgetFlushers.get(state)?.(); }
 const budgetWriters = new WeakMap<State, () => void>();
-export function bindBudget(state: State, persist: () => void) { budgetWriters.set(state, persist); }
+export function bindBudget(state: State, persist: () => void, flush?: () => Promise<void>) { budgetWriters.set(state, persist); if (flush) budgetFlushers.set(state, flush); }
 export function reserveAI(s: State, tokens: number) {
     const limits = settings(s);
     s.aiBudget ||= { calls: 0, tokens: 0 };

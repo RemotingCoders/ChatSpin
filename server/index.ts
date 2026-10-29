@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import {extensionRouter,extensionPreviewRouter} from '../extension/server/router.ts';
 import { settings, retain, bindBudget } from './limits.ts';
 import {questionPresentation,presentedSpin} from './presentation.ts';
 import {TranslationWork} from './translation.ts';
@@ -39,15 +40,6 @@ const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS || 0));
 app.use(express.json({ limit: '8kb' }));
-app.use(session({ secret: repository.secret, store: new PersistentSessions(repository), resave: false, saveUninitialized: false, cookie: { httpOnly: true, sameSite: 'lax', secure: origin.startsWith('https:'), maxAge: 86400000 } }));
-app.use((req, res, next) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Referrer-Policy', 'no-referrer');
-    res.setHeader('Cache-Control', 'no-store');
-    if (req.method !== 'GET' && req.headers.origin !== origin)
-        return res.status(403).json({ error: 'Request origin rejected.' });
-    next();
-});
 let real: State = repository.load();
 real.liveSession ||= randomBytes(12).toString('hex');
 for (const group of real.groups)
@@ -75,7 +67,7 @@ const enqueue = (id: string) => work.enqueue(id);
 const locked = (s: State) => !!s.spin && s.spin.end > Date.now();
 setInterval(() => {
     if (!locked(real) && !work.busy && !translator.busy && process.env.OPENAI_API_KEY)
-        void (async()=>{await work.tick();await translator.tick();})().catch(()=>{work.status='Processing failed; retained for retry';});
+        void (async()=>{await work.tick();await translator.tick();for(const [language,at] of extensionDemands){if(Date.now()-at>60000){extensionDemands.delete(language);continue;}if(language!==real.questionLanguage)await translator.tick(Date.now(),language);}})().catch(()=>{work.status='Processing failed; retained for retry';});
 }, 2500);
 function ingest(user: User, text: string, messageId?: string) {
     if (messageId&&(process.env.OPENAI_API_KEY||extractChatQuestion(text)))
@@ -103,6 +95,18 @@ if (storedCredentials && process.env.TWITCH_BROADCASTER_ID) {
             void twitch.start();
     });
 }
+const extensionDemands=new Map<'en'|'es'|'ru'|'de',number>();
+const extensionClientId=process.env.EXTENSION_CLIENT_ID||'';
+app.use('/extension-api',extensionRouter({state:()=>real,persist,enqueue,busy:()=>work.busy||translator.busy,demand:language=>extensionDemands.set(language,Date.now()),clientId:extensionClientId,secrets:[process.env.EXTENSION_SECRET||'',process.env.EXTENSION_PREVIOUS_SECRET||''],channel:process.env.TWITCH_BROADCASTER_ID||'',origins:[...(extensionClientId?[`https://${extensionClientId}.ext-twitch.tv`]:[]),...(process.env.EXTENSION_ALLOWED_ORIGINS||'').split(',').map(s=>s.trim()).filter(Boolean)],moderators:(process.env.MODERATOR_IDS||'').split(',').map(s=>s.trim()).filter(Boolean)}));
+app.use(session({ secret: repository.secret, store: new PersistentSessions(repository), resave: false, saveUninitialized: false, cookie: { httpOnly: true, sameSite: 'lax', secure: origin.startsWith('https:'), maxAge: 86400000 } }));
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'no-referrer');
+    res.setHeader('Cache-Control', 'no-store');
+    if (req.method !== 'GET' && req.headers.origin !== origin)
+        return res.status(403).json({ error: 'Request origin rejected.' });
+    next();
+});
 const isController = (req: express.Request) => !!req.session.user && (req.session.demo ? req.session.demoController === true : req.session.user.id === process.env.TWITCH_BROADCASTER_ID || (process.env.MODERATOR_IDS || '').split(',').includes(req.session.user.id));
 const stateFor = (req: express.Request) => req.session.demo ? demo : real;
 app.get('/api/session', (req, res) => res.json({ user: req.session.user || null, controller: isController(req), demo: !!req.session.demo, demoEnabled: process.env.ENABLE_DEMO !== 'false' && !production, configured: !!(process.env.TWITCH_CLIENT_ID && process.env.TWITCH_CLIENT_SECRET && process.env.TWITCH_BROADCASTER_ID), uiLanguage:(req.session.demo?demo:real).uiLanguage||'en',storageNotice: repository.warning, ai: process.env.OPENAI_API_KEY ? work.status : 'Not configured — explicit questions only', chatReplies: twitch?.canWriteChat ? replies.status : 'Reconnect Twitch to enable public approved-answer replies', connection: twitch?.status || 'Disconnected' }));
@@ -198,6 +202,7 @@ setInterval(() => { try {
 catch {
     work.status = 'Maintenance failed — inspect storage before continuing';
 } }, 3600000).unref();
+app.use('/api/extension-preview',extensionPreviewRouter(()=>demo,()=>{}));
 const rates = new Map<string, number[]>();
 app.post('/api/action', (req, res) => {
     const action = z.object({ type: z.string().max(30), id: z.string().max(100).optional(), target: z.string().max(100).optional(), text: z.string().max(2000).optional(), title: z.string().max(60).optional(), value: z.union([z.boolean(), z.string().max(30)]).optional(), confirmed: z.boolean().optional() }).parse(req.body);

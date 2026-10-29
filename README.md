@@ -156,3 +156,9 @@ Question translations use structured model output, are cached separately per lan
 Editing a title in a forced language updates that language's display title without rewriting the original question or other languages. Editing the title in original mode changes the source title and invalidates stale translations. Approved written answers are not automatically translated or rewritten.
 
 The labeled demo has prepared question translations in all four languages and makes no runtime model calls. UI catalogs are static, so changing interface language has no API cost. Developers can add missing UI strings with `node --import tsx scripts/generate-locales.ts`; this optional maintenance tool makes paid API calls with public UI strings only and preserves existing translations.
+
+## Optional Twitch Extension and hosted multi-channel backend
+
+The existing local app remains available. The optional [`extension/`](extension/README.md) provides panel, overlay, mobile, configuration and live control views with Twitch JWT authentication and personal display language. Hosted operation uses [`api/cloud.ts`](api/cloud.ts), Supabase tables with the `chatspin_` prefix, per-channel OAuth credentials and EventSub webhooks. It has no global broadcaster account. See [Vercel/Supabase deployment](docs/hosting.md) for variables, SQL, cron, installation paths, limitations and real-world verification. The normal Vite build serves the dashboard; the Twitch frontend ZIP is built separately.
+
+Public legal documents are served at `/privacy.html` and `/terms.html`; they distinguish the MIT source license from any future hosted service. Billing and Bits monetization are not implemented.
