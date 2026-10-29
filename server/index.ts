@@ -1,3 +1,4 @@
+import {reviewVersion,checkReviewVersion} from './domain.js';
 import './session-types.js';
 import 'dotenv/config';
 import {extensionRouter,extensionPreviewRouter} from '../extension/server/router.js';
@@ -49,7 +50,7 @@ const replies = new ApprovedReplies(() => real, async (message, parentId) => {
     if (!twitch)
         throw new Error('Twitch is disconnected.');
     await twitch.sendChatMessage(message, parentId);
-}, () => twitch?.status === 'Connected' && twitch.canWriteChat, persist, (group,questionText)=>answerTranslator.request({groupId:group.id,language:'detect',questionText}));
+}, () => twitch?.status === 'Connected' && twitch.canWriteChat, persist, process.env.OPENAI_API_KEY ? (group,questionText)=>answerTranslator.request({groupId:group.id,language:'detect',questionText}) : undefined);
 setInterval(() => { void replies.flush().catch(() => { replies.status = 'Reply persistence failed — inspect storage'; }); }, 2000);
 const work = new QuestionWork(real, persist, messages => detectQuestions(messages, real), ids => groupBatch(real, ids), (group, user, messageId, questionText) => { replies.enqueue(group, user, messageId, Date.now(), questionText); });
 persist();
@@ -81,10 +82,7 @@ const saveCredentials = (credentials: Credentials | null) => {
 const storedCredentials = repository.getSecret<Credentials>('twitch');
 if (storedCredentials && process.env.TWITCH_BROADCASTER_ID) {
     twitch = new TwitchConnection(storedCredentials, process.env.TWITCH_BROADCASTER_ID, ingest, undefined, saveCredentials);
-    void twitch.validate().then(() => {
-        if (twitch?.status === 'Disconnected')
-            void twitch.start();
-    });
+    void twitch.connect();
 }
 const extensionDemands=new Map<'en'|'es'|'ru'|'de',number>();
 const extensionClientId=process.env.EXTENSION_CLIENT_ID||'';
@@ -173,7 +171,7 @@ app.use('/api', (req, res, next) => {
 });
 app.get('/api/state', (req, res) => {
     const s = stateFor(req), controller = isController(req), id = req.session.user!.id;
-    res.json({ ...s,spin:presentedSpin(s),translationStatus:translator.status, answerTranslationJobs:undefined,approvedAnswerTranslations:undefined,answerLanguageCache:undefined,questionRates:undefined,replyHistory: undefined, replyJobs: undefined, replyLog: controller ? s.replyLog : undefined, aiJobs: undefined, pendingMessages: undefined, settings: controller ? settings(s) : undefined, aiBudget: controller ? s.aiBudget : undefined, entries: controller ? eligibleEntries(s) : undefined, groups: s.groups.map(g => ({ ...g, readiness:questionReadiness(s,g,!!process.env.OPENAI_API_KEY), text:questionPresentation(s,g).text,title:questionPresentation(s,g).title,displayLanguage:s.questionLanguage||'original',originalText:g.text,originalTitle:g.customTitle||g.text,translationPending:questionPresentation(s,g).pending,translations:undefined,translationAttempts:undefined,supporters: undefined, answerHistory: controller ? g.answerHistory : undefined, embedding: undefined, aiProcessed: controller ? g.aiProcessed : undefined, answerActive: answerIsActive(s, g), count: support(g), questions: controller ? g.questions : g.questions.filter(q => q.user.id === id), review: controller ? g.review : undefined, answer: (controller || (answerIsActive(s, g) && g.questions.some(q => q.user.id === id))) ? g.answer : '' })), participants: controller ? s.participants : s.participants.filter(p => p.id === id), obsUrl: controller ? `${origin}/obs?token=${req.session.demo ? obsTokens.demo : obsTokens.real}` : undefined, serverTime: Date.now() });
+    res.json({ ...s,spin:presentedSpin(s),translationStatus:translator.status, answerTranslationJobs:undefined,approvedAnswerTranslations:undefined,answerLanguageCache:undefined,questionRates:undefined,replyHistory: undefined, replyJobs: undefined, replyLog: controller ? s.replyLog : undefined, aiJobs: undefined, pendingMessages: undefined, settings: controller ? settings(s) : undefined, aiBudget: controller ? s.aiBudget : undefined, entries: controller ? eligibleEntries(s) : undefined, groups: s.groups.map(g => ({ ...g, reviewVersion:reviewVersion(g),readiness:questionReadiness(s,g,!!process.env.OPENAI_API_KEY), text:questionPresentation(s,g).text,title:questionPresentation(s,g).title,displayLanguage:s.questionLanguage||'original',originalText:g.text,originalTitle:g.customTitle||g.text,translationPending:questionPresentation(s,g).pending,translations:undefined,translationAttempts:undefined,supporters: undefined, answerHistory: controller ? g.answerHistory : undefined, embedding: undefined, aiProcessed: controller ? g.aiProcessed : undefined, answerActive: answerIsActive(s, g), count: support(g), questions: controller ? g.questions : g.questions.filter(q => q.user.id === id), review: controller ? g.review : undefined, answer: (controller || (answerIsActive(s, g) && g.questions.some(q => q.user.id === id))) ? g.answer : '' })), participants: controller ? s.participants : s.participants.filter(p => p.id === id), obsUrl: controller ? `${origin}/obs?token=${req.session.demo ? obsTokens.demo : obsTokens.real}` : undefined, serverTime: Date.now() });
 });
 app.get('/api/overlay', (req, res) => {
     const token = req.query.token;
@@ -196,7 +194,7 @@ catch {
 app.use('/api/extension-preview',extensionPreviewRouter(()=>demo,()=>{}));
 const rates = new Map<string, number[]>();
 app.post('/api/action', (req, res) => {
-    const action = z.object({ type: z.string().max(30), id: z.string().max(100).optional(), target: z.string().max(100).optional(), text: z.string().max(2000).optional(), title: z.string().max(60).optional(), value: z.union([z.boolean(), z.string().max(30)]).optional(), confirmed: z.boolean().optional() }).parse(req.body);
+    const action = z.object({ type: z.string().max(30), id: z.string().max(100).optional(), target: z.string().max(100).optional(), text: z.string().max(2000).optional(), title: z.string().max(60).optional(), value: z.union([z.boolean(), z.string().max(30)]).optional(), expected:z.string().length(64).optional(),confirmed: z.boolean().optional() }).parse(req.body);
     const s = stateFor(req), user = req.session.user!;
     const publicActions = ['ask', 'support', 'join', 'leave'];
     if (!publicActions.includes(action.type) && !isController(req))
@@ -215,6 +213,7 @@ app.post('/api/action', (req, res) => {
         return res.status(409).json({ error: 'Grouping is in progress. Please try again shortly.' });
     if(!s.demo&&replies.isSending&&['clear-questions','new-session'].includes(action.type))return res.status(409).json({error:'Wait for the current public reply to finish.'});
     const group = s.groups.find(g => g.id === action.id);
+    checkReviewVersion(group,action.expected);
     switch (action.type) {
         case 'ask': {
             const text = z.string().trim().min(3).max(500).parse(action.text);
@@ -299,7 +298,7 @@ app.post('/api/action', (req, res) => {
                 if (target)
                     for (const q of originals)
                         if (q.messageId && Date.now() - q.at <= 300000)
-                            replies.enqueue(target, q.user, q.messageId);
+                            replies.enqueue(target, q.user, q.messageId, Date.now(), q.text);
             }
             break;
         }
@@ -382,5 +381,5 @@ else {
     const vite = await createServer({ server: { middlewareMode: true }, appType: 'spa' });
     app.use(vite.middlewares);
 }
-app.use((error: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => { res.status(400).json({ error: error instanceof z.ZodError ? 'Please check the supplied values.' : error.message || 'Request failed.' }); });
+app.use((error: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => { res.status((error as Error & {status?:number}).status||400).json({ error: error instanceof z.ZodError ? 'Please check the supplied values.' : error.message || 'Request failed.' }); });
 app.listen(Number(process.env.PORT) || 3000, '127.0.0.1', () => console.log(`ChatSpin is running at ${origin}`));

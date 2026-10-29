@@ -46,7 +46,7 @@ Set variables in `.env`; never commit it.
 
 Changing `PORT` also requires changing `APP_URL`. Set `APP_URL` to the exact HTTPS public origin when using a reverse proxy. Set `TRUST_PROXY_HOPS=1` only when exactly one trusted reverse proxy terminates HTTPS; the default is `0` (no trusted proxy). Production requires a random signing/encryption secret of at least 32 characters.
 
-OpenAI API usage requires your own API configuration and billing; a ChatGPT or Codex subscription does not provide this application's API credentials. Usage displays request and input/output token totals. Estimate spend using your model's current API rates. Without a key, exact duplicate matching remains available; questions require explicit manual approval before entering the wheel. Forced-language translation still requires AI; select original language to use a manually reviewed question without translation.
+OpenAI API usage requires your own API configuration and billing; a ChatGPT or Codex subscription does not provide this application's API credentials. Usage displays request and input/output token totals. Estimate spend using your model's current API rates. Without a key, exact duplicate matching and public replies using the original approved answer remain available; questions require explicit manual approval before entering the wheel. With a key, public replies resolve the question language and translate the approved answer in one inference, reusing cached translations. Forced-language translation still requires AI; select original language to use a manually reviewed question without translation.
 
 ## Real Twitch walkthrough
 

@@ -41,3 +41,16 @@ The approved source text is retained unchanged. The extension uses the viewer’
 Automatic Twitch replies detect the language of the incoming question and translate only the approved answer. English, Spanish, German and Russian are supported; ambiguous or other languages withhold the reply with a logged reason. Translations share provider quotas, have three bounded attempts, and cache by approved text and target language. Changing the approved answer invalidates queued replies and old translation results. Reprocess retries failed translation jobs.
 
 Live check: approve an English answer, repeat the question in Spanish from another account, and verify a Spanish public reply mentioning that account. Switch a viewer to German and then Original: only that viewer’s answer display changes, while the saved approved source remains English.
+
+
+## Demo regression fixes (2026-10-29)
+
+- Public replies bypass translation when OpenAI is not configured. With AI, language detection and answer translation share one request; repeated text/language pairs reuse the cache. Manual merging preserves the viewer question text.
+- OBS legends show all entries without an internal scroll area, identical result text is not repeated, and candidate updates preserve wheel rotation. Results are scoped to the selected mode.
+- Startup token validation retries with bounded backoff. Revoked refresh credentials stop immediately; repeated transient failures stop with a reconnect message.
+- Cloud title edits use the persisted display language; validation errors return 400 and stale edits return 409. Overlay signatures are authenticated before loading or creating a channel.
+- Disconnect removes only this app's webhook subscriptions for that channel. Failed deletion is persisted for cron retry; a subsequent reconnect prevents deleting its new subscription.
+- Editors submit a version of the content they opened. A stale moderator edit is rejected without overwriting the saved answer; reopen the editor to review the current version.
+- Vercel runtime helpers are disabled through `NODEJS_HELPERS=0` in `vercel.json`; Express receives the original stream. The API entry also explicitly disables body parsing. A signed webhook regression uses whitespace-preserving raw bytes. Reference: https://vercel.com/docs/functions/runtimes/node-js/advanced-node-configuration
+
+Deployment needs the new backend/web build and a newly uploaded extension ZIP. No SQL migration is required. Real Twitch delivery, OBS canvas sizing, and the deployed webhook must still be checked in the live demo environment.

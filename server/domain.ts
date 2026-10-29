@@ -258,3 +258,7 @@ export function cleanupAnswerTranslations(s:State,mode:'prune'|'clear'|'new-sess
  }
  return before!==JSON.stringify([data.answerTranslationJobs,data.approvedAnswerTranslations,data.answerLanguageCache]);
 }
+
+// Optimistic edit token excludes votes and AI metadata so chat activity cannot block editing.
+export function reviewVersion(g:Group){return createHash('sha256').update(JSON.stringify([g.title,g.customTitle,g.answer,g.status,g.answerScope,g.answerSession,Object.entries(g.translations||{}).map(([language,value])=>[language,value.title])])).digest('hex');}
+export function checkReviewVersion(g:Group|undefined,expected?:string){if(expected&&(!g||reviewVersion(g)!==expected))throw Object.assign(Error('This question was edited by someone else. Reopen it before saving.'),{status:409});}

@@ -1,3 +1,4 @@
+import {reviewVersion,checkReviewVersion} from '../../server/domain.js';
 import {z} from 'zod';
 import {approvedAnswerPresentation} from '../../server/answer-translations.js';
 import {addQuestion,approveQuestion,answerIsActive,eligibleEntries,rememberAnswer,spin,support,type State,type User} from '../../server/domain.js';
@@ -12,7 +13,7 @@ export function extensionState(s:State,actor:ExtensionActor,language:QuestionLan
  return {controller:actor.controller,canParticipate:!!actor.user,anonymous:actor.anonymous,user:actor.user||null,demo:s.demo,mode:s.mode,odds:s.odds,registration:s.registration,excludeSelected:s.excludeSelected,entries,spin:draw,serverTime:Date.now(),uiLanguage:s.uiLanguage||'en',questionLanguage:language,participantCount:s.participants.length,joined:!!actor.user&&s.participants.some(p=>p.id===actor.user!.id),groups:s.groups.map(g=>{
   const approved=approvedAnswerPresentation(s,g,language);
   const display=questionPresentation({...s,questionLanguage:language},g);const own=!!actor.user&&g.questions.some(q=>q.user.id===actor.user!.id);
-  return {id:g.id,title:display.title,text:display.text,translationPending:display.pending,readiness:questionReadiness({...s,questionLanguage:language},g,!!process.env.OPENAI_API_KEY),count:support(g),status:g.status,asked:own,answer:answerIsActive(s,g)&&(own||actor.controller)?approved.text:'',originalAnswer:actor.controller?g.answer:undefined,answerTranslationPending:answerIsActive(s,g)&&(own||actor.controller)&&approved.pending,answerTranslationFailed:answerIsActive(s,g)&&(own||actor.controller)&&approved.failed,originals:actor.controller?g.questions:own?g.questions.filter(q=>q.user.id===actor.user!.id):[]};
+  return {id:g.id,reviewVersion:actor.controller?reviewVersion(g):undefined,title:display.title,text:display.text,translationPending:display.pending,readiness:questionReadiness({...s,questionLanguage:language},g,!!process.env.OPENAI_API_KEY),count:support(g),status:g.status,asked:own,answer:answerIsActive(s,g)&&(own||actor.controller)?approved.text:'',originalAnswer:actor.controller?g.answer:undefined,answerTranslationPending:answerIsActive(s,g)&&(own||actor.controller)&&approved.pending,answerTranslationFailed:answerIsActive(s,g)&&(own||actor.controller)&&approved.failed,originals:actor.controller?g.questions:own?g.questions.filter(q=>q.user.id===actor.user!.id):[]};
  })};
 }
 const actionSchema=z.discriminatedUnion('type',[
@@ -23,10 +24,10 @@ const actionSchema=z.discriminatedUnion('type',[
  z.object({type:z.literal('approve-question'),id:z.string().max(100)}).strict(),
  z.object({type:z.literal('mode'),value:z.enum(['questions','participants'])}).strict(),
  z.object({type:z.literal('odds'),value:z.enum(['equal','support','manual'])}).strict(),
- z.object({type:z.literal('answer'),id:z.string().max(100),text:z.string().trim().max(2000),scope:z.enum(['session','permanent']).default('session'),removeFromWheel:z.boolean().default(true)}).strict()
+ z.object({type:z.literal('answer'),expected:z.string().length(64).optional(),id:z.string().max(100),text:z.string().trim().max(2000),scope:z.enum(['session','permanent']).default('session'),removeFromWheel:z.boolean().default(true)}).strict()
 ]);
 export type ExtensionAction=z.infer<typeof actionSchema>;
-export function applyExtensionAction(s:State,actor:ExtensionActor,body:unknown,enqueue:(id:string)=>void,busy=false){
+function applyAction(s:State,actor:ExtensionActor,body:unknown,enqueue:(id:string)=>void,busy=false){
  const action=actionSchema.parse(body),participation=['ask','support','join','leave'].includes(action.type);
  if(!participation&&!actor.controller)throw Object.assign(Error('Streamer or authorized moderator access required.'),{status:403});
  if(participation&&!actor.user)throw Object.assign(Error('Share your Twitch identity to participate.'),{status:403});
@@ -45,6 +46,8 @@ export function applyExtensionAction(s:State,actor:ExtensionActor,body:unknown,e
   case 'odds':s.odds=action.value;break;
   case 'toggle-registration':s.registration=!s.registration;break;
   case 'toggle-exclusion':s.excludeSelected=!s.excludeSelected;break;
-  case 'answer':{const g=s.groups.find(g=>g.id===action.id);if(!g)throw Error('Question not found.');rememberAnswer(g);g.answer=action.text;g.status=action.removeFromWheel?(action.text?'written':'live'):'pending';g.answerScope=action.scope;g.answerSession=s.liveSession;break;}
+  case 'answer':{const g=s.groups.find(g=>g.id===action.id);if(!g)throw Error('Question not found.');checkReviewVersion(g,action.expected);rememberAnswer(g);g.answer=action.text;g.status=action.removeFromWheel?(action.text?'written':'live'):'pending';g.answerScope=action.scope;g.answerSession=s.liveSession;break;}
  }
 }
+
+export function applyExtensionAction(...args:Parameters<typeof applyAction>){try{return applyAction(...args);}catch(error){if(error instanceof Error&&!('status' in error))Object.assign(error,{status:400});throw error;}}

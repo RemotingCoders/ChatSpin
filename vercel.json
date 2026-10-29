@@ -34,5 +34,8 @@
       "path": "/api/cron",
       "schedule": "* * * * *"
     }
-  ]
+  ],
+  "env": {
+    "NODEJS_HELPERS": "0"
+  }
 }

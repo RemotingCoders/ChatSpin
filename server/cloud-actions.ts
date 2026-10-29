@@ -1,12 +1,14 @@
+import {checkReviewVersion} from './domain.js';
 import {z} from 'zod';
 import {randomBytes} from 'node:crypto';
 import {addQuestion,cleanupAnswerTranslations,approveQuestion,merge,split,spin,rememberAnswer,type State,type User} from './domain.js';
 import {clearCollection} from './reset.js';
 import {ApprovedAnswerTranslations} from './answer-translations.js';
 import {questionPresentation} from './presentation.js';
-const schema=z.object({type:z.string().max(30),id:z.string().max(100).optional(),target:z.string().max(100).optional(),text:z.string().max(2000).optional(),title:z.string().max(60).optional(),value:z.union([z.boolean(),z.string().max(30)]).optional(),confirmed:z.boolean().optional()}).strict();
-export function cloudDashboardAction(s:State,user:User,body:unknown){
+const schema=z.object({type:z.string().max(30),id:z.string().max(100).optional(),target:z.string().max(100).optional(),text:z.string().max(2000).optional(),title:z.string().max(60).optional(),value:z.union([z.boolean(),z.string().max(30)]).optional(),expected:z.string().length(64).optional(),confirmed:z.boolean().optional()}).strict();
+function applyDashboardAction(s:State,user:User,body:unknown){
  const action=schema.parse(body),group=s.groups.find(g=>g.id===action.id);
+ checkReviewVersion(group,action.expected);
  if(s.spin&&s.spin.end>Date.now()&&action.type!=='ui-language')throw Object.assign(Error('Wait for the current spin to finish.'),{status:409});
  const enqueue=(id:string)=>{s.aiJobs||=[];if(!s.aiJobs.some(job=>job.id===id))s.aiJobs.push({id,attempts:0,next:0});};
  switch(action.type){
@@ -36,4 +38,11 @@ export function cloudDashboardAction(s:State,user:User,body:unknown){
   default:throw Error('Unknown action.');
  }
  return ['clear-questions','clear-participants','new-session'].includes(action.type);
+}
+
+export function cloudDashboardAction(...args:Parameters<typeof applyDashboardAction>){
+ try{return applyDashboardAction(...args);}catch(error){
+  if(error instanceof Error&&!('status' in error))Object.assign(error,{status:400});
+  throw error;
+ }
 }

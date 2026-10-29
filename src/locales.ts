@@ -1,5 +1,6 @@
 // Static UI catalogs. No runtime model calls.
 export const german:Record<string,string|string[]>={
+  "This question was edited by someone else. Reopen it before saving.": "Diese Frage wurde von jemand anderem bearbeitet. Öffne sie vor dem Speichern erneut.",
   "Manual review required — AI is not configured": "Manuelle Prüfung erforderlich — KI ist nicht konfiguriert",
   "Channel moderators": "Kanalmoderatoren",
   "Only the channel owner can manage this list. Approved Twitch moderators can control the extension after sharing their identity.": "Nur der Kanalinhaber kann diese Liste verwalten. Freigegebene Twitch-Moderatoren können die Erweiterung nach Freigabe ihrer Identität steuern.",
@@ -343,6 +344,7 @@ export const german:Record<string,string|string[]>={
   "Clear all participants?": "Alle Teilnehmer löschen?"
 };
 export const russian:Record<string,string|string[]>={
+  "This question was edited by someone else. Reopen it before saving.": "Этот вопрос изменил другой пользователь. Откройте его заново перед сохранением.",
   "Manual review required — AI is not configured": "Требуется ручная проверка — ИИ не настроен",
   "Channel moderators": "Модераторы канала",
   "Only the channel owner can manage this list. Approved Twitch moderators can control the extension after sharing their identity.": "Только владелец канала может управлять списком. Одобренные модераторы Twitch могут управлять расширением после предоставления своей учётной записи.",

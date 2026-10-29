@@ -19,6 +19,11 @@ export class TwitchConnection {
     private expires: number;
     private refreshing?: Promise<string>;
     private validating = false;
+    private validationRetry?: ReturnType<typeof setTimeout>;
+    private validationFailures=0;
+    private refreshFailures=0;
+    private resumeAfterValidation=false;
+    async connect(){this.resumeAfterValidation=true;await this.validate();if(!this.stopped&&this.status==='Disconnected'){this.resumeAfterValidation=false;await this.start();}}
     constructor(private credentials: Credentials, private broadcaster: string, private onMessage: (user: User, text: string, messageId?: string) => void, private endpoint = 'wss://eventsub.wss.twitch.tv/ws', private save: (credentials: Credentials | null) => void = () => { }, private beforeSend:()=>Promise<void>=async()=>{}) { this.expires = credentials.expires_at || Date.now() + credentials.expires_in * 1000; }
     get canWriteChat() { return this.credentials.scope?.includes('user:write:chat') === true; }
     async sendChatMessage(message: string, parentId: string) {
@@ -44,8 +49,11 @@ export class TwitchConnection {
             return this.refreshing;
         this.refreshing = (async () => {
             const response = await timedFetch('https://id.twitch.tv/oauth2/token', { method: 'POST', body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: this.credentials.refresh_token, client_id: process.env.TWITCH_CLIENT_ID!, client_secret: process.env.TWITCH_CLIENT_SECRET! }) });
-            if (!response.ok)
-                throw new Error('Twitch authorization expired. Connect again.');
+            if (!response.ok) {
+                if([400,401,403].includes(response.status)){this.stop();this.save(null);this.status='Authorization expired. Connect again.';}
+                throw new Error('Twitch token refresh failed.');
+            }
+            this.refreshFailures=0;
             this.credentials = { ...this.credentials, ...await response.json() as Credentials };
             this.expires = Date.now() + this.credentials.expires_in * 1000;
             this.save({ ...this.credentials, expires_at: this.expires });
@@ -54,6 +62,7 @@ export class TwitchConnection {
         try {
             return await this.refreshing;
         }
+        catch(error){if(!this.stopped&&++this.refreshFailures>=5){this.stop();this.status='Twitch token refresh unavailable. Connect again.';}throw error;}
         finally {
             this.refreshing = undefined;
         }
@@ -64,6 +73,7 @@ export class TwitchConnection {
         this.validating = true;
         try {
             const response = await timedFetch('https://id.twitch.tv/oauth2/validate', { headers: { Authorization: `OAuth ${await this.token()}` } });
+            if (!response.ok && ![401,403].includes(response.status))throw Error('Temporary validation failure');
             if (!response.ok) {
                 this.stop();
                 this.save(null);
@@ -75,6 +85,7 @@ export class TwitchConnection {
                 client_id: string;
                 scopes: string[];
             };
+            this.validationFailures=0;clearTimeout(this.validationRetry);this.status=this.socket?'Connected':'Disconnected';
             if (identity.user_id !== this.broadcaster || identity.client_id !== process.env.TWITCH_CLIENT_ID) {
                 this.stop();
                 this.save(null);
@@ -82,7 +93,12 @@ export class TwitchConnection {
             }
         }
         catch {
+            if(this.stopped)return;
+            this.validationFailures++;
+            if(this.validationFailures>=5){this.stop();this.status='Twitch validation unavailable. Connect again.';return;}
             this.status = 'Token validation failed — retrying';
+            clearTimeout(this.validationRetry);
+            this.validationRetry=setTimeout(()=>{void this.validate().then(()=>{if(this.resumeAfterValidation&&!this.stopped&&this.status==='Disconnected'){this.resumeAfterValidation=false;void this.start();}});},Math.min(60000,5000*2**(this.validationFailures-1)));
         }
         finally {
             this.validating = false;
@@ -165,6 +181,6 @@ export class TwitchConnection {
         if (!this.validation)
             this.validation = setInterval(() => void this.validate(), 60 * 60 * 1000);
     }
-    stop() { this.stopped = true; clearTimeout(this.retry); clearInterval(this.validation); for (const socket of this.sockets)
+    stop() { this.stopped = true; clearTimeout(this.retry); clearInterval(this.validation);clearTimeout(this.validationRetry); for (const socket of this.sockets)
         socket.close(); this.status = 'Disconnected'; }
 }

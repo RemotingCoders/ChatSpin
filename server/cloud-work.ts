@@ -52,7 +52,7 @@ async function runCloudChannel(repository:SupabaseRepository,channel:string,prog
   const job=state.replyJobs?.find(j=>j.messageId===parent);sending=job?{groupId:job.groupId,answer:job.answer}:undefined;
   await flush();if(!twitch)throw Error('Twitch is disconnected.');
   await twitch.sendChatMessage(message,parent);
- },()=>!!twitch?.canWriteChat&&twitch.status==='Connected',persist,(group,questionText)=>answerTranslator.request({groupId:group.id,language:'detect',questionText}));
+ },()=>!!twitch?.canWriteChat&&twitch.status==='Connected',persist,process.env.OPENAI_API_KEY ? (group,questionText)=>answerTranslator.request({groupId:group.id,language:'detect',questionText}) : undefined);
  const work=new QuestionWork(state,persist,messages=>(services.detect||detectQuestions)(messages,state),ids=>(services.group||groupBatch)(state,ids),(g,user,messageId,questionText)=>{replies.enqueue(g,user,messageId,Date.now(),questionText);});
   progress.stage='inbox';const inbox=await repository.inbox(channel);
   const eventSchema=z.object({user:z.object({id:z.string().regex(/^\d+$/),name:z.string(),login:z.string().optional()}),text:z.string().max(2000),messageId:z.string(),at:z.number()});
@@ -82,7 +82,7 @@ async function runCloudChannel(repository:SupabaseRepository,channel:string,prog
    }
   }
   progress.stage='answer translation';
-  for(const job of state.replyJobs||[])answerTranslator.request({groupId:job.groupId,language:'detect',questionText:job.questionText});
+  for(const job of process.env.OPENAI_API_KEY ? state.replyJobs||[] : [])answerTranslator.request({groupId:job.groupId,language:'detect',questionText:job.questionText});
   for(const language of languages)if(['en','es','de','ru'].includes(language))for(const group of state.groups)if(answerIsActive(state,group))answerTranslator.request({groupId:group.id,language:language as 'en'|'es'|'de'|'ru'});
   if(process.env.OPENAI_API_KEY&&Date.now()<deadline){await answerTranslator.tick(Date.now(),1);await flush();}
   progress.stage='public replies';

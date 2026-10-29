@@ -18,3 +18,5 @@ html.obs-page,html.obs-page body,html.obs-page #root,html.obs-page .overlay{back
 
 .wheel-panel .wheel-center-action{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:21.5%;height:21.5%;min-height:0;border-radius:50%;margin:0;padding:4px;border:2px solid #c1a3ff;background:#15121c;color:#f3edf9;font-size:clamp(10px,1.2vw,13px);font-weight:700;line-height:1.15;overflow-wrap:anywhere;z-index:2}
 .wheel-panel .wheel-center-action:not(:disabled):hover{background:#38224e}
+
+.overlay .wheel-legend{max-height:none;overflow:visible}

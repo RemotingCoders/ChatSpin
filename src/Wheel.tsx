@@ -1,5 +1,5 @@
 import {useI18n} from './i18n';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import type { Spin } from '../server/domain';
 type Entry = {
     id: string;
@@ -35,6 +35,8 @@ export function Wheel({ spin, entries, clock, centerAction }: {
 }) {
  const {t,formatDate}=useI18n();
     const [rotation, setRotation] = useState(0);
+    const rotationRef=useRef(0);
+    const drawRef=useRef({id:'',from:0});
     const candidates = spin?.candidates || entries;
     const total = candidates.reduce((sum, candidate) => sum + candidate.weight, 0) || 1;
     let cursor = 0;
@@ -47,15 +49,19 @@ export function Wheel({ spin, entries, clock, centerAction }: {
     const finalRotation = winner ? 1800 + 360 - (winner.start + winner.end) / 2 : 0;
     useEffect(() => {
         let frame: number;
+        if(!spin)return;
+        if(drawRef.current.id!==spin.id)drawRef.current={id:spin.id,from:rotationRef.current};
+        const from=drawRef.current.from,target=Math.ceil(from/360)*360+finalRotation;
         const tick = () => {
             const duration = spin ? spin.end - spin.start : 0;
             const progress = spin
                 ? window.matchMedia('(prefers-reduced-motion: reduce)').matches || !duration
                     ? 1
                     : Math.min(1, Math.max(0, (Date.now() + clock - spin.start) / duration))
-                : 0;
-            setRotation(finalRotation * (1 - Math.pow(1 - progress, 4)));
-            if (progress < 1 && spin)
+                : 1;
+            const next=from+(target-from)*(1-Math.pow(1-progress,4));
+            rotationRef.current=next;setRotation(next);
+            if (progress < 1)
                 frame = requestAnimationFrame(tick);
         };
         tick();

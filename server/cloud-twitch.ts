@@ -33,6 +33,7 @@ export async function subscribeCloudChat(repository:SupabaseRepository,channel:s
  if(response.status===409&&before)await repository.replaceSecret(channel,'chat-status',before.version,{status:'Checking existing chat subscription',checkedAt:0});
 }
 export async function reconcileCloudChat(repository:SupabaseRepository,channel:string,origin:string,secret:string,now=Date.now()){
+ if(await repository.getSecret(channel,'eventsub-cleanup')){await unsubscribeCloudChat(repository,channel,origin);return;}
  const current=await repository.secretRecord<ChatStatus>(channel,'chat-status');
  if(!current||stopped(current.value)||current.value.checkedAt&&current.value.checkedAt>now-300000)return;
  if(!await repository.getSecret(channel,'twitch'))return;
@@ -97,4 +98,21 @@ export function cloudWebhooks(repository:SupabaseRepository,secret:string,schedu
   await repository.putSecret(channel,'inbox:'+event.message_id,{user:{id:event.chatter_user_id,name:String(event.chatter_user_name||event.chatter_user_id),login:String(event.chatter_user_login||'')},text:event.message.text,messageId:event.message_id,at:Date.now()});
   schedule(channel);res.sendStatus(204);
  });return router;
+}
+
+/** Delete only this channel's webhook at our callback, never another app endpoint. */
+export async function unsubscribeCloudChat(repository:SupabaseRepository,channel:string,origin:string){
+ try{
+  const token=await appToken();let cursor:string|undefined;
+  const ids:string[]=[];
+  do{
+   const url=new URL(subscriptionEndpoint);url.searchParams.set('user_id',channel);url.searchParams.set('first','100');if(cursor)url.searchParams.set('after',cursor);
+   const response=await timedFetch(url,{headers:headers(token)});if(!response.ok)throw Error('Subscription lookup failed');
+   const body=await response.json();
+   for(const row of body.data||[])if(row.type==='channel.chat.message'&&row.condition?.broadcaster_user_id===channel&&row.condition?.user_id===channel&&row.transport?.method==='webhook'&&row.transport.callback===origin+'/api/twitch/events/'+channel)ids.push(row.id);
+   cursor=body.pagination?.cursor;
+  }while(cursor);
+  for(const id of ids){if(await repository.getSecret(channel,'twitch'))break;const response=await timedFetch(subscriptionEndpoint+'?id='+encodeURIComponent(id),{method:'DELETE',headers:headers(token)});if(!response.ok&&response.status!==404)throw Error('Subscription deletion failed');}
+  await repository.removeSecret(channel,'eventsub-cleanup');
+ }catch{await repository.putSecret(channel,'eventsub-cleanup',{origin});throw Object.assign(Error('Disconnected. Twitch subscription cleanup is pending; it will be retried.'),{status:503});}
 }

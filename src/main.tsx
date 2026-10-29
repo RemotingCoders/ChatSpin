@@ -61,7 +61,7 @@ function App() {
         }
     }
     const inSpin = !!state?.spin && state.spin.end > now + clock;
-    const result = state?.spin && !inSpin ? state.spin : null;
+    const result = state?.spin && state.spin.mode === state.mode && !inSpin ? state.spin : null;
     const groups = state?.groups || [], pending = groups.filter(g => g.status === 'pending');
     const group = groups.find(g => g.id === selected);
     const controller = session?.controller && !viewer;

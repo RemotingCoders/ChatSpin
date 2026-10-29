@@ -1,3 +1,5 @@
+// Preserve EventSub bytes for HMAC verification; Express owns parsing.
+export const config={api:{bodyParser:false}};
 import type {IncomingMessage,ServerResponse} from 'node:http';
 import {createCloudApp} from '../server/cloud.js';
 import {SupabaseRepository} from '../server/supabase.js';

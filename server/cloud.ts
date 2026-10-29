@@ -1,3 +1,4 @@
+import {reviewVersion} from './domain.js';
 import express from 'express';
 import {restoreCloudBackup} from './cloud-backups.js';
 import {createHmac,randomBytes,timingSafeEqual} from 'node:crypto';
@@ -7,7 +8,7 @@ import {SupabaseRepository,StateConflict,ChannelBusy,type CloudState} from './su
 import {cloudExtensionRouter} from '../extension/server/cloud.js';
 import {cloudAuthentication} from './cloud-auth.js';
 import {cloudDashboardAction} from './cloud-actions.js';
-import {cloudWebhooks,reconcileCloudChat} from './cloud-twitch.js';
+import {cloudWebhooks,reconcileCloudChat,unsubscribeCloudChat} from './cloud-twitch.js';
 import {processCloudChannel,CloudProcessingError} from './cloud-work.js';
 import {questionPresentation,presentedSpin,questionReadiness} from './presentation.js';
 import {answerIsActive,eligibleEntries,support} from './domain.js';
@@ -45,7 +46,10 @@ export function createCloudApp(repository:SupabaseRepository,origin:string,secre
  app.get('/api/overlay',async(req,res)=>{
   const supplied=typeof req.query.token==='string'?req.query.token:'';
   if(!/^\d{1,30}:[a-f0-9]{1,64}:[a-f0-9]{64}$/.test(supplied))return res.sendStatus(403);
-  const channel=supplied.split(':')[0],{state}=await repository.view(channel),expected=token(state,channel);
+  const [channel,version]=supplied.split(':');
+  const signed=channel+':'+version+':'+createHmac('sha256',secret).update('chatspin.obs:'+channel+':'+version).digest('hex');
+  if(!timingSafeEqual(Buffer.from(supplied),Buffer.from(signed)))return res.sendStatus(403);
+  const {state}=await repository.view(channel),expected=token(state,channel);
   const displayLanguage=await repository.publicSetting<typeof state.questionLanguage>(channel,'question-language');if(displayLanguage)state.questionLanguage=displayLanguage;
   if(supplied.length!==expected.length||!timingSafeEqual(Buffer.from(supplied),Buffer.from(expected)))return res.sendStatus(403);
   res.json({spin:presentedSpin(state),questionLanguage:state.questionLanguage||'original',uiLanguage:state.uiLanguage||'en',translationPending:state.groups.some(g=>questionPresentation(state,g).pending),entries:eligibleEntries(state),demo:false,mode:state.mode,serverTime:Date.now()});
@@ -57,7 +61,7 @@ export function createCloudApp(repository:SupabaseRepository,origin:string,secre
   // Explicitly omit server coordination metadata, inbox, tokens, budgets of other channels.
   const {cloudLease,cloudRates,cloudTranslations,cloudMaintenance,cloudStatus,...safe}=s;
   delete (safe as Record<string,unknown>).cloudEvents;delete (safe as Record<string,unknown>).cloudObsVersion;
-  res.json({...safe,hosted:true,aiBudget:undefined,usage:undefined,replyJobs:undefined,answerTranslationJobs:undefined,approvedAnswerTranslations:undefined,answerLanguageCache:undefined,questionRates:undefined,replyHistory:undefined,pendingMessages:undefined,aiJobs:undefined,settings:undefined,spin:presentedSpin(s),translationStatus:s.cloudStatus?.translation||'Ready',entries:eligibleEntries(s),groups:s.groups.map(g=>({...g,readiness:questionReadiness(s,g,!!process.env.OPENAI_API_KEY),text:questionPresentation(s,g).text,title:questionPresentation(s,g).title,originalText:g.text,originalTitle:g.customTitle||g.text,translationPending:questionPresentation(s,g).pending,translations:undefined,translationAttempts:undefined,embedding:undefined,supporters:undefined,count:support(g),answerActive:answerIsActive(s,g)})),obsUrl:origin+'/obs?token='+encodeURIComponent(token(s,channel)),serverTime:Date.now()});schedule(channel);
+  res.json({...safe,hosted:true,aiBudget:undefined,usage:undefined,replyJobs:undefined,answerTranslationJobs:undefined,approvedAnswerTranslations:undefined,answerLanguageCache:undefined,questionRates:undefined,replyHistory:undefined,pendingMessages:undefined,aiJobs:undefined,settings:undefined,spin:presentedSpin(s),translationStatus:s.cloudStatus?.translation||'Ready',entries:eligibleEntries(s),groups:s.groups.map(g=>({...g,reviewVersion:reviewVersion(g),readiness:questionReadiness(s,g,!!process.env.OPENAI_API_KEY),text:questionPresentation(s,g).text,title:questionPresentation(s,g).title,displayLanguage:s.questionLanguage||'original',originalText:g.text,originalTitle:g.customTitle||g.text,translationPending:questionPresentation(s,g).pending,translations:undefined,translationAttempts:undefined,embedding:undefined,supporters:undefined,count:support(g),answerActive:answerIsActive(s,g)})),obsUrl:origin+'/obs?token='+encodeURIComponent(token(s,channel)),serverTime:Date.now()});schedule(channel);
  });
  app.get('/api/backups',async(req,res)=>res.json({backups:await repository.backups(req.session.user!.id)}));
  app.get('/api/backups/:id',async(req,res)=>{const backup=await repository.backup(req.session.user!.id,String(req.params.id));res.json({id:backup.id,createdAt:backup.createdAt,groups:backup.state.groups.map(g=>({title:g.title,status:g.status})),participants:backup.state.participants.length});});
@@ -76,11 +80,14 @@ export function createCloudApp(repository:SupabaseRepository,origin:string,secre
   }else if(req.body?.type==='disconnect'){
    await repository.removeSecret(channel,'twitch');await repository.putSecret(channel,'chat-status',{status:'Disconnected'});
    await repository.mutate(channel,s=>{delete s.cloudLease;s.replyJobs=[];});
+   await unsubscribeCloudChat(repository,channel,origin);
   }else{
    const backup=['clear-questions','clear-participants','new-session'].includes(req.body?.type);
+   const displayLanguage=await repository.publicSetting<CloudState['questionLanguage']>(channel,'question-language');
    await repository.mutate(channel,s=>{
+    if(displayLanguage)s.questionLanguage=displayLanguage;
     if(req.body?.type==='rotate-obs'){
-     if(req.body.confirmed!==true)throw Error('Confirm regenerating the OBS link.');(s as CloudState&{cloudObsVersion?:string}).cloudObsVersion=randomBytes(16).toString('hex');return;
+     if(req.body.confirmed!==true)throw Object.assign(Error('Confirm regenerating the OBS link.'),{status:400});(s as CloudState&{cloudObsVersion?:string}).cloudObsVersion=randomBytes(16).toString('hex');return;
     }
     cloudDashboardAction(s,user,req.body);
    },backup);

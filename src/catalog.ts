@@ -1,5 +1,6 @@
 import {german,russian} from './locales';
 export const spanish:Record<string,string|string[]>={
+  "This question was edited by someone else. Reopen it before saving.": "Otra persona editó esta pregunta. Volvé a abrirla antes de guardar.",
   "Manual review required — AI is not configured": "Revisión manual requerida — la IA no está configurada",
   "Channel moderators": "Moderadores del canal",
   "Only the channel owner can manage this list. Approved Twitch moderators can control the extension after sharing their identity.": "Solo el dueño del canal puede administrar esta lista. Los moderadores de Twitch autorizados pueden controlar la extensión al compartir su identidad.",

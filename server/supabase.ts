@@ -116,7 +116,7 @@ export class SupabaseRepository {
   return rows.map((row:any)=>({id:String(row.id),createdAt:row.created_at,groups:row.state.groups.length,participants:row.state.participants.length}));
  }
  async backup(channel:string,id:string){
-  if(!/^\d{1,20}$/.test(id))throw Error('Invalid backup.');
+  if(!/^\d{1,20}$/.test(id))throw Object.assign(Error('Invalid backup.'),{status:400});
   const rows=await this.api('chatspin_snapshots?channel_id=eq.'+this.channel(channel)+'&id=eq.'+id+'&select=id,created_at,state');
   if(rows.length!==1)throw Object.assign(Error('Backup not found.'),{status:404});return {id:String(rows[0].id),createdAt:rows[0].created_at,state:validateState(rows[0].state)};
  }
