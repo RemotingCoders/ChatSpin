@@ -1,5 +1,6 @@
 import {useI18n} from '../../src/i18n';
 const messages:Record<string,[string,string,string]>={
+ 'Save answer and mark answered':['Guardar respuesta y marcar como respondida','Antwort speichern und als beantwortet markieren','Сохранить ответ и отметить вопрос отвеченным'],
  'Move ChatSpin panel':['Mover panel de ChatSpin','ChatSpin-Panel verschieben','Переместить панель ChatSpin'],
  'Drag to move. Arrow keys move; Home resets.':['Arrastrá para mover. Las flechas mueven; Inicio restablece.','Zum Verschieben ziehen. Pfeiltasten bewegen; Pos1 setzt zurück.','Перетащите для перемещения. Стрелки перемещают; Home сбрасывает.'],
  'Follow channel language':['Seguir idioma del canal','Sprache des Kanals übernehmen','Использовать язык канала'],
