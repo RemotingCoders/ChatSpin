@@ -29,6 +29,17 @@ test('Supabase provider failures do not expose provider bodies or secrets',async
  await assert.rejects(repository.load('101'),error=>error instanceof Error&&!error.message.includes('private-token'));
  assert.throws(()=>new SupabaseRepository('http://project.supabase.co','server-only','a'.repeat(40)));
 });
+test('Application conflict responses use bounded retries and support the previous database code during migration',async()=>{
+ for(const code of ['PT409','40001']){
+  let attempts=0;
+  const repository=new SupabaseRepository('https://project.supabase.co','server-only','a'.repeat(40),(async(input)=>{
+   if(String(input).includes('/rpc/')){attempts++;return Response.json({code},{status:409});}
+   return Response.json([{channel_id:'101',revision:0,state:emptyState()}]);
+  }) as typeof fetch);
+  await assert.rejects(repository.mutate('101',()=>{}),StateConflict);
+  assert.equal(attempts,4);
+ }
+});
 test('Multi-channel extension trusts signed channel only and isolates owner controls',async()=>{
  const {repository}=database(),secret=randomBytes(32).toString('base64'),origin='https://extension.ext-twitch.tv';
  const token=(channel:string,role='broadcaster',user=channel)=>{const head=Buffer.from(JSON.stringify({alg:'HS256'})).toString('base64url'),payload=Buffer.from(JSON.stringify({channel_id:channel,role,opaque_user_id:'U'+user,user_id:user,exp:Date.now()/1000+300})).toString('base64url'),data=head+'.'+payload;return data+'.'+createHmac('sha256',Buffer.from(secret,'base64')).update(data).digest('base64url');};

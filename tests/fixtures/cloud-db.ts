@@ -13,7 +13,7 @@ export function database(){
   }
   if(path==='rpc/chatspin_commit'){
    const record=channels.get(body.p_channel_id);
-   if(record.revision!==body.p_revision)return response({code:'40001'},409);
+   if(record.revision!==body.p_revision)return response({code:'PT409'},409);
    record.state=body.p_state;record.revision++;return response(record.revision);
   }
   if(path==='chatspin_secrets'){

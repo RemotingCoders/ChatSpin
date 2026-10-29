@@ -21,7 +21,7 @@ export class SupabaseRepository {
  private async api(path:string,init:RequestInit={}){
   const response=await this.request(this.origin+'/rest/v1/'+path,{...init,headers:{apikey:this.secret,'Content-Type':'application/json',...init.headers},signal:AbortSignal.timeout(15000)});
   if(!response.ok){let code='';try{code=(await response.json()).code;}catch{}
-   if(code==='40001')throw new StateConflict();
+   if(code==='PT409'||code==='40001')throw new StateConflict();
    // Never surface provider bodies: they may contain submitted data or configuration.
    throw Error('ChatSpin database request failed. Check server configuration and migration.');
   }
