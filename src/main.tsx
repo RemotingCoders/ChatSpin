@@ -75,7 +75,7 @@ function App() {
     return <div className="app">
     <aside className="sidebar">
     <a className="brand" href="/">
-    <span className="brand-icon">✦</span> ChatSpin<span className="brand-period">.</span>
+    <span className="brand-icon" aria-hidden="true"><svg viewBox="0 0 100 100" focusable="false"><path d="M50 14C55 38 62 45 86 50C62 55 55 62 50 86C45 62 38 55 14 50C38 45 45 38 50 14Z" fill="currentColor"/></svg></span> ChatSpin<span className="brand-period">.</span>
     </a>
     <div className="workspace">
     <span className="avatar">{session?.user?.name.slice(0, 1).toUpperCase() || 'C'}</span>
