@@ -51,3 +51,15 @@ test('Extension HTTP API enforces JWT, channel, CORS and viewer permissions inde
   assert.equal((await call('/state',jwt(claims({channel_id:'54321'})))).status,401);
  }finally{await new Promise<void>(r=>server.close(()=>r()));}
 });
+
+test('Answer saving removes empty and written answers from the wheel by default, with explicit opt-out',()=>{
+ for(const text of ['', 'Argentina'])for(const removeFromWheel of [undefined,true,false]){
+  const state=emptyState(),group=addQuestion(state,{id:'99',name:'Viewer'},'Where are you from?');
+  const actor={controller:true,anonymous:false,user:{id:channel,name:'Owner'}};
+  applyExtensionAction(state,actor,{type:'answer',id:group.id,text,...(removeFromWheel===undefined?{}:{removeFromWheel})},()=>{});
+  const projected=extensionState(state,actor,'original');
+  assert.equal(group.answer,text);assert.equal(projected.entries.some(entry=>entry.id===group.id),removeFromWheel===false);
+  assert.equal(group.status,removeFromWheel===false?'pending':text?'written':'live');
+  assert.equal(group.questions.length,1);
+ }
+});
