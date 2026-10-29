@@ -30,7 +30,13 @@ export function Dashboard({ state, presentation, entries, clock, inSpin, busy, a
     <span className="badge neutral">{entries.length}{t(" ELIGIBLE")}</span>
     </div>
     <p className="muted">{t("A small spin. A new conversation.")}</p>
-    <Wheel spin={presentation.spin} entries={entries} clock={clock}/>
+    <Wheel spin={presentation.spin} entries={entries} clock={clock} centerAction={<button
+      className="wheel-center-action"
+      aria-label={inSpin ? t("✦ Finding the next voice…") : t("✦ Spin the wheel")}
+      title={t("✦ Spin the wheel")}
+      disabled={busy || inSpin || !entries.length || (state.mode === 'questions' && state.odds === 'manual')}
+      onClick={() => act('spin')}
+    >{t("✦ Spin the wheel").replace('✦', '').trim()}</button>}/>
     <div className="wheel-controls">{state.mode === 'questions' ? <>
         <label htmlFor="odds">{t("Selection method")}</label>
         <select id="odds" value={state.odds} disabled={busy || inSpin} onChange={e => act('settings', { value: e.target.value })}>
@@ -45,8 +51,7 @@ export function Dashboard({ state, presentation, entries, clock, inSpin, busy, a
         <label className="check">
         <input type="checkbox" checked={state.excludeSelected} disabled={inSpin} onChange={e => act('exclude', { value: e.target.checked })}/>{t(" Exclude previously selected people")}</label>
         <p className="help">{t("Use !join to enter and !leave to withdraw. No microphone or call is started.")}</p>
-        </>}<button className="primary spin-button" disabled={busy || inSpin || !entries.length || (state.mode === 'questions' && state.odds === 'manual')} onClick={() => act('spin')}>{inSpin ? t("\u2726 Finding the next voice\u2026") : t("\u2726 Spin the wheel")}<span>↗</span>
-    </button>
+        </>}
     <small className="wheel-caption">{session.demo ? t("Demo spin \u00B7 simulated community") : t("Chosen securely \u00B7 synchronized with OBS")}</small>
     </div>
     <details className="chances">

@@ -15,3 +15,6 @@ html.obs-page,html.obs-page body,html.obs-page #root,html.obs-page .overlay{back
 .language-picker{display:flex;align-items:center;gap:8px;margin:0;font-size:11px}.language-picker select{width:auto;min-width:100px;padding:7px}.language-settings{border:1px solid #403747;border-radius:8px;padding:14px;margin:14px 0}.language-settings label{display:block;max-width:300px}.language-settings legend{font-size:12px;padding:0 8px}.language-settings select{margin-top:6px}@media(max-width:700px){.header-actions{flex-wrap:wrap}.language-picker{font-size:10px}.language-picker select{min-width:85px}header{height:auto;min-height:77px;padding-top:12px;padding-bottom:12px}}
 
 @media(max-width:650px){.header-user{max-width:135px;font-size:11px}}
+
+.wheel-panel .wheel-center-action{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:21.5%;height:21.5%;min-height:0;border-radius:50%;margin:0;padding:4px;border:2px solid #c1a3ff;background:#15121c;color:#f3edf9;font-size:clamp(10px,1.2vw,13px);font-weight:700;line-height:1.15;overflow-wrap:anywhere;z-index:2}
+.wheel-panel .wheel-center-action:not(:disabled):hover{background:#38224e}
