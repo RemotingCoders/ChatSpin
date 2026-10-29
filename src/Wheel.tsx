@@ -27,10 +27,11 @@ function wrapLabel(label: string, limit: number) {
         return [...lines.slice(0, 2), lines[2].slice(0, limit - 1) + '…'];
     return lines;
 }
-export function Wheel({ spin, entries, clock }: {
+export function Wheel({ spin, entries, clock, centerAction }: {
     spin: Spin | null;
     entries: Entry[];
     clock: number;
+    centerAction?: React.ReactNode;
 }) {
  const {t,formatDate}=useI18n();
     const [rotation, setRotation] = useState(0);
@@ -96,8 +97,9 @@ export function Wheel({ spin, entries, clock }: {
         }) : <circle cx="200" cy="200" r="184" fill="#282333"/>}
         </g>
         <circle cx="200" cy="200" r="43" fill="#15121c" stroke="#c1a3ff" strokeWidth="3"/>
-        <text x="200" y="208" textAnchor="middle" fill="#dacbfa" fontSize="27">✦</text>
+        {!centerAction&&<text x="200" y="208" textAnchor="middle" fill="#dacbfa" fontSize="27">✦</text>}
       </svg>
+      {centerAction}
       <span className="wheel-dot d1"/><span className="wheel-dot d2"/>
     </div>
     {slices.length > 0 && <ol className="wheel-legend" aria-label={t("Wheel entries")}>
