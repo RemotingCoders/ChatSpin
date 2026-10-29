@@ -4,6 +4,20 @@ Give your Twitch community a turn. ChatSpin organizes interview questions and se
 
 Built from an empty directory with Codex during the Codex x TwitchCon Hackathon submission period. The interface supports English, Spanish, Russian and German. Question presentation can preserve the original language or use any of those four languages; original viewer messages remain intact. Documentation is in English.
 
+## Built with Codex
+
+ChatSpin was built with OpenAI Codex through iterative implementation, code review, automated testing and live Twitch debugging. Codex helped build the React interface, question processing and translations, Twitch OAuth/EventSub integration, extension views, hosted persistence, authorization and regression tests. Human testing drove product choices and verified live behavior; automated checks are recorded in [verification](docs/VERIFICATION.md).
+
+Main Codex session ID: `01a17004-f93e-7b11-bd0e-82c75f7e2e0a` (the same thread supplied in the Devpost submission).
+
+No construction-footage clip is currently published in this repository. The locally prepared narration and black-background timing video are not footage of building with Codex. The final demo should include real Codex build/debug footage and the working Twitch integration, with its public YouTube link added here when available. See the [official submission requirements](https://twitchcon-codex.devpost.com/rules).
+
+### Project name and hackathon entrant
+
+The project is **ChatSpin**. The Twitch registration uses **ChatSpin by TapLinko** because Twitch rejected the shorter name during registration. The creator states that TapLinko is a trademark registered in his personal name in Argentina; this repository does not independently verify that registration. Registration evidence can be supplied for verification through Argentina’s INPI if requested.
+
+TapLinko identifies the creator’s brand, not a company entering the hackathon. The Devpost draft identifies the entrant as a **Team of Individuals** (Damián and Sol). Brand use does not establish eligibility or replace the organizers’ review of entrant and project ownership requirements.
+
 ## Run locally
 
 Requirements: Node.js 24+ (built-in SQLite), npm, and a modern browser.

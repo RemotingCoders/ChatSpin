@@ -41,7 +41,7 @@
       }
     });
     const title = document.querySelector('h1');
-    if (title) document.title = title.textContent + ' · ChatSpin by TapLinko';
+    if (title) document.title = title.textContent + ' · ChatSpin';
   }
   function ready() {
     document.querySelectorAll('[data-language-choice]').forEach((button) =>

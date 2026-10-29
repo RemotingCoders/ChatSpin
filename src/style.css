@@ -966,6 +966,7 @@ blockquote {
 }
 footer {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 15px;
   color: #c2b7d1;
@@ -1647,4 +1648,15 @@ nav a {
   .spotlight-content {
     padding-inline: 0;
   }
+}
+
+.legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.legal-links a {
+  color: #c2b7d1;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }

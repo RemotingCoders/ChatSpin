@@ -1,5 +1,9 @@
 // Static UI catalogs. No runtime model calls.
 export const german: Record<string, string | string[]> = {
+  'Legal information': 'Rechtliche Informationen',
+  'Privacy policy': 'Datenschutz',
+  'Terms of use': 'Nutzungsbedingungen',
+
   'This question was edited by someone else. Reopen it before saving.':
     'Diese Frage wurde von jemand anderem bearbeitet. Öffne sie vor dem Speichern erneut.',
   'Manual review required — AI is not configured':
@@ -424,6 +428,10 @@ export const german: Record<string, string | string[]> = {
   'Clear all participants?': 'Alle Teilnehmer löschen?',
 };
 export const russian: Record<string, string | string[]> = {
+  'Legal information': 'Правовая информация',
+  'Privacy policy': 'Конфиденциальность',
+  'Terms of use': 'Условия использования',
+
   'This question was edited by someone else. Reopen it before saving.':
     'Этот вопрос изменил другой пользователь. Откройте его заново перед сохранением.',
   'Manual review required — AI is not configured': 'Требуется ручная проверка — ИИ не настроен',

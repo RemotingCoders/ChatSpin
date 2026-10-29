@@ -1,5 +1,9 @@
 import { german, russian } from './locales';
 export const spanish: Record<string, string | string[]> = {
+  'Legal information': 'Información legal',
+  'Privacy policy': 'Privacidad',
+  'Terms of use': 'Términos de uso',
+
   'This question was edited by someone else. Reopen it before saving.':
     'Otra persona editó esta pregunta. Volvé a abrirla antes de guardar.',
   'Manual review required — AI is not configured':

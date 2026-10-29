@@ -534,6 +534,10 @@ function App() {
               ChatSpin <b>✦</b>
               {t(' Made for the moments between chat and conversation.')}
             </span>
+            <nav className="legal-links" aria-label={t('Legal information')}>
+              <a href="/privacy.html">{t('Privacy policy')}</a>
+              <a href="/terms.html">{t('Terms of use')}</a>
+            </nav>
             <span>{t('Built with Codex')}</span>
           </footer>
         </main>

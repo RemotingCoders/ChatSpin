@@ -26,7 +26,7 @@ From the repository root:
 VITE_EXTENSION_API_ORIGIN=https://chatspin.taplinko.store npm run extension:package
 ```
 
-Upload `extension/chatspin-extension.zip` in the Twitch version's **Files** tab. Files must be at the ZIP root. Build output is readable and excludes the local preview. This frontend ZIP is separate from the Vercel web dashboard build. Uploading it does not release the extension publicly. Use Hosted Test, allowlist your Twitch test accounts, install/activate it on the channel, and configure the paths above. Privacy and terms URLs must be publicly accessible before review; replace the provisional dashboard screenshot with the actual extension UI.
+Upload `extension/chatspin-extension.zip` in the Twitch version's **Files** tab. Files must be at the ZIP root. Build output is readable and excludes the local preview. This frontend ZIP is separate from the Vercel web dashboard build. Uploading it does not release the extension publicly. Use Hosted Test, allowlist your Twitch test accounts, install/activate it on the channel, and configure the paths above. Privacy and terms URLs must be publicly accessible before review; the included 1024×768 screenshot now shows the actual extension frontend in a local preview, explicitly labeled as simulated data. It is not a capture of a live Twitch channel.
 
 For Local Test, serve the generated frontend over a locally trusted HTTPS origin and set the Base URI accordingly. The backend must be reachable by the viewer's browser. A bundle configured with localhost cannot serve remote testers.
 
@@ -52,3 +52,7 @@ not change the broadcaster's settings or another viewer's layout. Positions stay
 inside the video when its size changes, including fullscreen. Panel and mobile
 views keep their regular layout. Upload a newly generated extension ZIP to Twitch
 to deliver this frontend change.
+
+## Directory screenshot provenance
+
+`assets/chatspin-screenshot-1024x768.png` was captured from the actual extension viewer preview on October 29, 2026, with simulated questions and no Twitch credentials or private messages. A small border pads the browser capture to Twitch’s required 1024×768 dimensions without changing the UI. It replaces the previous web-dashboard image. Upload this PNG separately in Version Details → Screenshot Image; a Vercel deployment or frontend ZIP upload does not update directory images. For the final submission video, record the extension actually running on Twitch as well.
