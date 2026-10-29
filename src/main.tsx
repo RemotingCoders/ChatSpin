@@ -103,7 +103,7 @@ function App() {
     <div className="breadcrumb">{t("Workspace ")}<span>/</span> <b>{viewer ? t("Viewer space") : t("Live dashboard")}</b>
     </div>
     <div className="header-actions"><LanguagePicker act={act} controller={!!session?.controller&&!viewer}/>{session?.demo && <span className="badge">{t("DEMO \u00B7 SIMULATED DATA")}</span>}<span className="connection">
-    <i className={session?.connection === 'Connected' && !session.demo ? 'online' : ''}/>{session?.demo ? t("Twitch disconnected") : session?.connection || t("Loading")}</span>{session?.user ? <button className="quiet" onClick={async () => { await request('/api/logout', {}); await load(); }}>{t("Sign out")}</button> : <a className="button" href="/auth/twitch?role=streamer">{t("Connect Twitch")}</a>}</div>
+    <i className={session?.connection === 'Connected' && !session.demo ? 'online' : ''}/>{session?.demo ? t("Twitch disconnected") : session?.connection || t("Loading")}</span>{session?.user && <span className="header-user" title={session.user.name}>{session.user.name}</span>}{session?.user ? <button className="quiet" onClick={async () => { await request('/api/logout', {}); await load(); }}>{t("Sign out")}</button> : <a className="button" href="/auth/twitch?role=streamer">{t("Connect Twitch")}</a>}</div>
     </header>
     <main>
     <div className="page-title">
