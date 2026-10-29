@@ -1,3 +1,4 @@
+import { RequestError } from '../../server/request-error.js';
 import { reviewVersion, checkReviewVersion } from '../../server/domain.js';
 import { z } from 'zod';
 import { approvedAnswerPresentation } from '../../server/answer-translations.js';
@@ -157,12 +158,12 @@ function applyAction(
     }
     case 'support': {
       const g = s.groups.find((g) => g.id === action.id);
-      if (!g || g.status !== 'pending') throw Error('Choose a pending question.');
+      if (!g || g.status !== 'pending') throw new RequestError('Choose a pending question.');
       if (!g.supporters.includes(user!.id)) g.supporters.push(user!.id);
       break;
     }
     case 'join':
-      if (!s.registration) throw Error('Registration is closed.');
+      if (!s.registration) throw new RequestError('Registration is closed.');
       if (!s.participants.some((p) => p.id === user!.id))
         s.participants.push({ ...user!, selected: false });
       break;
@@ -192,7 +193,7 @@ function applyAction(
       break;
     case 'answer': {
       const g = s.groups.find((g) => g.id === action.id);
-      if (!g) throw Error('Question not found.');
+      if (!g) throw new RequestError('Question not found.');
       checkReviewVersion(g, action.expected);
       rememberAnswer(g);
       g.answer = action.text;
@@ -205,10 +206,5 @@ function applyAction(
 }
 
 export function applyExtensionAction(...args: Parameters<typeof applyAction>) {
-  try {
-    return applyAction(...args);
-  } catch (error) {
-    if (error instanceof Error && !('status' in error)) Object.assign(error, { status: 400 });
-    throw error;
-  }
+  return applyAction(...args);
 }

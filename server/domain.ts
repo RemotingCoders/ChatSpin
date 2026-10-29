@@ -1,3 +1,4 @@
+import { RequestError } from './request-error.js';
 import { seedDemoTranslations } from './demoTranslations.js';
 import {
   questionPresentation,
@@ -169,7 +170,9 @@ export function addQuestion(
     return exact;
   }
   if (s.groups.length >= settings(s).maxGroups)
-    throw new Error('Question limit reached. Archive or clear questions before adding more.');
+    throw new RequestError(
+      'Question limit reached. Archive or clear questions before adding more.',
+    );
   const group: Group = {
     id: randomUUID(),
     title: text.slice(0, 48),
@@ -206,13 +209,16 @@ export function merge(
 ) {
   const source = s.groups.find((g) => g.id === from),
     target = s.groups.find((g) => g.id === to);
-  if (!source || !target || source === target) throw new Error('Choose two different groups.');
+  if (!source || !target || source === target)
+    throw new RequestError('Choose two different groups.');
   if (target.status !== 'pending' && !approved) {
     source.review = target.id;
     return;
   }
   if (source.answer && target.answer && source.answer !== target.answer && !choice)
-    throw new Error('Both groups have different saved answers. Choose which answer to keep.');
+    throw new RequestError(
+      'Both groups have different saved answers. Choose which answer to keep.',
+    );
   const history = [...(target.answerHistory || []), ...(source.answerHistory || [])];
   if (source.answer) history.push({ text: source.answer, at: Date.now() });
   if (target.answer) history.push({ text: target.answer, at: Date.now() });
@@ -232,7 +238,7 @@ export function split(s: State, groupId: string, questionId: string) {
   const group = s.groups.find((g) => g.id === groupId);
   const q = group?.questions.find((q) => q.id === questionId);
   if (!group || !q || group.questions.length < 2)
-    throw new Error('A group must retain at least one original.');
+    throw new RequestError('A group must retain at least one original.');
   group.questions = group.questions.filter((x) => x.id !== questionId);
   const fresh: Group = {
     id: randomUUID(),
@@ -265,13 +271,13 @@ export function eligibleEntries(s: State) {
         .map((p) => ({ id: p.id, label: p.name, weight: 1 }));
 }
 export function spin(s: State, manualId?: string, now = Date.now()): Spin {
-  if (s.spin && s.spin.end > now) throw new Error('A spin is already in progress.');
+  if (s.spin && s.spin.end > now) throw new RequestError('A spin is already in progress.');
   const candidates = eligibleEntries(s);
-  if (!candidates.length) throw new Error('No eligible entries yet.');
+  if (!candidates.length) throw new RequestError('No eligible entries yet.');
   let winner;
   if (s.mode === 'questions' && (s.odds === 'manual' || manualId)) {
     winner = candidates.find((c) => c.id === manualId);
-    if (!winner) throw new Error('Choose an eligible question.');
+    if (!winner) throw new RequestError('Choose an eligible question.');
   } else {
     let ticket = randomInt(candidates.reduce((sum, c) => sum + c.weight, 0));
     winner = candidates.find((c) => (ticket -= c.weight) < 0)!;
@@ -328,7 +334,7 @@ export function demoState() {
 // A deliberate owner review may bypass model grouping, never the selected translation.
 export function approveQuestion(s: State, id: string) {
   const group = s.groups.find((g) => g.id === id);
-  if (!group || group.status !== 'pending') throw Error('Choose a pending question.');
+  if (!group || group.status !== 'pending') throw new RequestError('Choose a pending question.');
   group.aiProcessed = true;
   delete group.review;
   s.aiJobs = s.aiJobs?.filter((job) => job.id !== id);

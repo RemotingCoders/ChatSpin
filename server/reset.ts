@@ -1,3 +1,4 @@
+import { RequestError } from './request-error.js';
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -16,7 +17,7 @@ export function archiveSession(state: State, stateFile: string) {
 
 export function clearCollection(state: State, target: ClearTarget, archive: () => void) {
   if (state.spin && state.spin.end > Date.now())
-    throw new Error('Wait for the current spin to finish.');
+    throw new RequestError('Wait for the current spin to finish.');
   archive();
   if (target === 'questions') {
     cleanupAnswerTranslations(state, 'clear');

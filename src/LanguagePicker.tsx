@@ -5,7 +5,7 @@ export function LanguagePicker({ act, controller = false }: { act: Act; controll
   const { language, setLanguage, t } = useI18n();
   return (
     <label className="language-picker">
-      {t('Interface language')}
+      <span className="language-picker-label">{t('Interface language')}</span>
       <select
         aria-label={t('Interface language')}
         value={language}

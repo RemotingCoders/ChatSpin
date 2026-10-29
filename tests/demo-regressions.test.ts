@@ -140,7 +140,8 @@ test('Validation failures are client errors with actionable messages', () => {
   );
 });
 
-test('Failed token refresh stops permanently on revoked credentials and bounds transient retries', async () => {
+test('Failed token refresh stops on revoked credentials but transient outages back off and recover', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'] });
   const previous = globalThis.fetch;
   try {
     for (const status of [400, 503]) {
@@ -155,8 +156,20 @@ test('Failed token refresh stops permanently on revoked credentials and bounds t
         },
       );
       globalThis.fetch = (async () => new Response('{}', { status })) as typeof fetch;
-      for (let i = 0; i < (status === 400 ? 1 : 5); i++) await assert.rejects(client.token());
-      assert.match(client.status, /Connect again/);
+      for (let i = 0; i < (status === 400 ? 1 : 7); i++) {
+        await assert.rejects(client.token());
+        t.mock.timers.tick(60000);
+      }
+      assert.match(client.status, status === 400 ? /Connect again/ : /retrying/);
+      if (status === 503) {
+        globalThis.fetch = (async () =>
+          Response.json({
+            access_token: 'recovered',
+            refresh_token: 'valid',
+            expires_in: 3600,
+          })) as typeof fetch;
+        assert.equal(await client.token(), 'recovered');
+      }
       assert.equal(removed, status === 400);
       client.stop();
     }
@@ -328,5 +341,56 @@ test('Startup validation retries after a transient outage and actually starts th
     client.stop();
     t.mock.timers.reset();
     globalThis.fetch = previous;
+  }
+});
+
+test('Unexpected action exceptions are not relabeled as client validation errors', () => {
+  const s = emptyState();
+  Object.defineProperty(s, 'participants', {
+    get() {
+      throw new TypeError('Internal state details');
+    },
+  });
+  for (const run of [
+    () => cloudDashboardAction(s, user, { type: 'join' }),
+    () =>
+      applyExtensionAction(
+        s,
+        { controller: true, anonymous: false, user },
+        { type: 'join' },
+        () => {},
+      ),
+  ])
+    assert.throws(run, (error: any) => error instanceof TypeError && !('status' in error));
+  assert.throws(
+    () => cloudDashboardAction(emptyState(), user, { type: 'set-moderators', text: '{broken' }),
+    (error: any) => error.name === 'ZodError',
+  );
+});
+
+test('Cloud internal failures return a generic 500 without implementation details', async () => {
+  const { repository } = database();
+  repository.getSession = async () => {
+    throw new TypeError('Internal database details');
+  };
+  const secret = 'a'.repeat(40),
+    id = 'existing-session';
+  const signature = createHmac('sha256', secret).update(id).digest('base64').replace(/=+$/, '');
+  const cookie = 'chatspin.sid=' + encodeURIComponent('s:' + id + '.' + signature);
+  const server = createCloudApp(repository, 'https://chatspin.example', secret, () => {}).listen(
+    0,
+    '127.0.0.1',
+  );
+  await new Promise<void>((r) => server.once('listening', r));
+  try {
+    const response = await fetch(
+      'http://127.0.0.1:' + (server.address() as any).port + '/api/session',
+      { headers: { Cookie: cookie } },
+    );
+    assert.equal(response.status, 500);
+    assert.deepEqual(await response.json(), { error: 'Cloud request failed. Please retry.' });
+  } finally {
+    server.close();
+    server.closeAllConnections();
   }
 });

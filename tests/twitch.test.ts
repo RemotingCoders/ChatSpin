@@ -160,3 +160,93 @@ test('Concurrent token requests share one refresh and persist the new credential
     globalThis.fetch = original;
   }
 });
+
+test('Validation outages preserve a subscribed socket and successful validation cannot complete a handshake', async () => {
+  const server = new WebSocketServer({ port: 0, host: '127.0.0.1' });
+  await new Promise<void>((r) => server.once('listening', r));
+  const address = server.address();
+  if (!address || typeof address === 'string') throw Error('No address');
+  const original = globalThis.fetch;
+  let validationStatus = 200,
+    received = 0,
+    removed = false;
+  let socket: WebSocket | undefined;
+  server.on('connection', (s) => {
+    socket = s;
+  });
+  globalThis.fetch = (async (url) =>
+    String(url).includes('/validate')
+      ? Response.json(
+          { user_id: 'owner', client_id: process.env.TWITCH_CLIENT_ID },
+          { status: validationStatus },
+        )
+      : Response.json({}, { status: 202 })) as typeof fetch;
+  const client = new TwitchConnection(
+    { access_token: 'test', refresh_token: 'test', expires_in: 3600 },
+    'owner',
+    () => received++,
+    `ws://127.0.0.1:${address.port}`,
+    (value) => {
+      removed = value === null;
+    },
+  );
+  const until = async (predicate: () => boolean) => {
+    const deadline = Date.now() + 2000;
+    while (!predicate()) {
+      if (Date.now() > deadline) throw Error('State timeout');
+      await new Promise((r) => setTimeout(r, 10));
+    }
+  };
+  try {
+    await client.start();
+    await client.validate();
+    assert.notEqual(client.status, 'Connected');
+    await until(() => !!socket);
+    await client.validate();
+    assert.notEqual(client.status, 'Connected');
+    socket!.send(
+      JSON.stringify({
+        metadata: { message_type: 'session_welcome' },
+        payload: { session: { id: 'ready' } },
+      }),
+    );
+    await until(() => client.status === 'Connected');
+    validationStatus = 503;
+    for (let i = 0; i < 7; i++) await client.validate();
+    const serviceFetch = globalThis.fetch;
+    globalThis.fetch = async () => {
+      throw new TypeError('Network unavailable');
+    };
+    await client.validate();
+    globalThis.fetch = serviceFetch;
+    validationStatus = 429;
+    await client.validate();
+    assert.equal(client.status, 'Connected');
+    assert.equal(removed, false);
+    socket!.send(
+      JSON.stringify({
+        metadata: { message_type: 'notification', message_id: 'still-live' },
+        payload: {
+          event: {
+            chatter_user_id: 'viewer',
+            chatter_user_name: 'Viewer',
+            message: { text: 'Still working?' },
+          },
+        },
+      }),
+    );
+    await until(() => received === 1);
+    validationStatus = 200;
+    await client.validate();
+    assert.equal(client.status, 'Connected');
+    validationStatus = 401;
+    await client.validate();
+    assert.equal(removed, true);
+    assert.match(client.status, /Connect again/);
+  } finally {
+    client.stop();
+    globalThis.fetch = original;
+    for (const s of server.clients) s.terminate();
+    await new Promise<void>((r) => server.close(() => r()));
+  }
+});

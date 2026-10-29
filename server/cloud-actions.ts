@@ -1,3 +1,4 @@
+import { RequestError } from './request-error.js';
 import { checkReviewVersion } from './domain.js';
 import { z } from 'zod';
 import { randomBytes } from 'node:crypto';
@@ -44,7 +45,19 @@ function applyDashboardAction(s: State, user: User, body: unknown) {
           z
             .array(z.string().regex(/^\d{1,30}$/))
             .max(20)
-            .parse(JSON.parse(action.text || '[]')),
+            .parse(
+              z
+                .string()
+                .transform((text, ctx) => {
+                  try {
+                    return JSON.parse(text);
+                  } catch {
+                    ctx.addIssue({ code: 'custom', message: 'Invalid moderator list.' });
+                    return z.NEVER;
+                  }
+                })
+                .parse(action.text || '[]'),
+            ),
         ),
       ];
       break;
@@ -57,11 +70,12 @@ function applyDashboardAction(s: State, user: User, body: unknown) {
       break;
     }
     case 'support':
-      if (!group || group.status !== 'pending') throw Error('Choose a pending question.');
+      if (!group || group.status !== 'pending')
+        throw new RequestError('Choose a pending question.');
       if (!group.supporters.includes(user.id)) group.supporters.push(user.id);
       break;
     case 'join':
-      if (!s.registration) throw Error('Registration is closed.');
+      if (!s.registration) throw new RequestError('Registration is closed.');
       if (!s.participants.some((p) => p.id === user.id))
         s.participants.push({ ...user, selected: false });
       break;
@@ -83,7 +97,7 @@ function applyDashboardAction(s: State, user: User, body: unknown) {
       break;
     case 'answer':
     case 'live':
-      if (!group) throw Error('Question not found.');
+      if (!group) throw new RequestError('Question not found.');
       rememberAnswer(group);
       group.answer =
         action.type === 'answer' ? z.string().trim().min(1).max(2000).parse(action.text) : '';
@@ -92,7 +106,7 @@ function applyDashboardAction(s: State, user: User, body: unknown) {
       group.answerSession = s.liveSession;
       break;
     case 'reopen':
-      if (!group) throw Error('Question not found.');
+      if (!group) throw new RequestError('Question not found.');
       rememberAnswer(group);
       group.status = 'pending';
       group.answer = '';
@@ -100,10 +114,12 @@ function applyDashboardAction(s: State, user: User, body: unknown) {
       enqueue(group.id);
       break;
     case 'edit': {
-      if (!group) throw Error('Question not found.');
+      if (!group) throw new RequestError('Question not found.');
       const language = s.questionLanguage || 'original';
       if (action.value && action.value !== language)
-        throw Error('Question language changed. Reopen the question before editing its title.');
+        throw new RequestError(
+          'Question language changed. Reopen the question before editing its title.',
+        );
       const title = z.string().trim().min(1).max(60).parse(action.title);
       if (language === 'original') {
         group.title = title;
@@ -111,7 +127,7 @@ function applyDashboardAction(s: State, user: User, body: unknown) {
       } else {
         const cached = group.translations?.[language];
         if (!cached || questionPresentation(s, group).pending)
-          throw Error('Wait for translation before editing this title.');
+          throw new RequestError('Wait for translation before editing this title.');
         cached.title = title;
       }
       break;
@@ -133,7 +149,8 @@ function applyDashboardAction(s: State, user: User, body: unknown) {
       break;
     case 'clear-questions':
     case 'clear-participants':
-      if (action.confirmed !== true) throw Error('Confirm before clearing this collection.');
+      if (action.confirmed !== true)
+        throw new RequestError('Confirm before clearing this collection.');
       clearCollection(
         s,
         action.type === 'clear-questions' ? 'questions' : 'participants',
@@ -148,7 +165,7 @@ function applyDashboardAction(s: State, user: User, body: unknown) {
         status: 403,
       });
     case 'new-session':
-      if (action.confirmed !== true) throw Error('Confirm starting a new live session.');
+      if (action.confirmed !== true) throw new RequestError('Confirm starting a new live session.');
       s.liveSession = randomBytes(12).toString('hex');
       cleanupAnswerTranslations(s, 'new-session');
       s.usage = { calls: 0, input: 0, output: 0 };
@@ -159,7 +176,7 @@ function applyDashboardAction(s: State, user: User, body: unknown) {
       break;
     case 'question-language':
       if (!process.env.OPENAI_API_KEY && action.value !== 'original')
-        throw Error('Configure OpenAI to translate questions.');
+        throw new RequestError('Configure OpenAI to translate questions.');
       s.questionLanguage = z.enum(['original', 'en', 'es', 'ru', 'de']).parse(action.value);
       break;
     case 'reprocess':
@@ -177,16 +194,11 @@ function applyDashboardAction(s: State, user: User, body: unknown) {
       new ApprovedAnswerTranslations(s, () => {}).retry();
       break;
     default:
-      throw Error('Unknown action.');
+      throw new RequestError('Unknown action.');
   }
   return ['clear-questions', 'clear-participants', 'new-session'].includes(action.type);
 }
 
 export function cloudDashboardAction(...args: Parameters<typeof applyDashboardAction>) {
-  try {
-    return applyDashboardAction(...args);
-  } catch (error) {
-    if (error instanceof Error && !('status' in error)) Object.assign(error, { status: 400 });
-    throw error;
-  }
+  return applyDashboardAction(...args);
 }

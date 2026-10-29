@@ -12,6 +12,7 @@ export class TwitchConnection {
   status = 'Disconnected';
   private socket?: WebSocket;
   private sockets = new Set<WebSocket>();
+  private readySocket?: WebSocket;
   private stopped = false;
   private retry?: ReturnType<typeof setTimeout>;
   private validation?: ReturnType<typeof setInterval>;
@@ -22,6 +23,7 @@ export class TwitchConnection {
   private validationRetry?: ReturnType<typeof setTimeout>;
   private validationFailures = 0;
   private refreshFailures = 0;
+  private nextRefreshAttempt = 0;
   private resumeAfterValidation = false;
   async connect() {
     this.resumeAfterValidation = true;
@@ -79,6 +81,8 @@ export class TwitchConnection {
   async token(): Promise<string> {
     if (Date.now() <= this.expires - 60000) return this.credentials.access_token;
     if (this.refreshing) return this.refreshing;
+    if (Date.now() < this.nextRefreshAttempt)
+      throw new Error('Twitch token refresh unavailable — retrying shortly.');
     this.refreshing = (async () => {
       const response = await timedFetch('https://id.twitch.tv/oauth2/token', {
         method: 'POST',
@@ -98,6 +102,7 @@ export class TwitchConnection {
         throw new Error('Twitch token refresh failed.');
       }
       this.refreshFailures = 0;
+      this.nextRefreshAttempt = 0;
       this.credentials = { ...this.credentials, ...((await response.json()) as Credentials) };
       this.expires = Date.now() + this.credentials.expires_in * 1000;
       this.save({ ...this.credentials, expires_at: this.expires });
@@ -106,9 +111,12 @@ export class TwitchConnection {
     try {
       return await this.refreshing;
     } catch (error) {
-      if (!this.stopped && ++this.refreshFailures >= 5) {
-        this.stop();
-        this.status = 'Twitch token refresh unavailable. Connect again.';
+      if (!this.stopped) {
+        this.refreshFailures++;
+        this.nextRefreshAttempt =
+          Date.now() + Math.min(60000, 5000 * 2 ** Math.min(4, this.refreshFailures - 1));
+        if (!(this.readySocket === this.socket && this.socket?.readyState === WebSocket.OPEN))
+          this.status = 'Twitch token refresh unavailable — retrying';
       }
       throw error;
     } finally {
@@ -137,7 +145,10 @@ export class TwitchConnection {
       };
       this.validationFailures = 0;
       clearTimeout(this.validationRetry);
-      this.status = this.socket ? 'Connected' : 'Disconnected';
+      if (this.readySocket === this.socket && this.socket?.readyState === WebSocket.OPEN)
+        this.status = 'Connected';
+      else if (!this.socket || this.socket.readyState === WebSocket.CLOSED)
+        this.status = 'Disconnected';
       if (
         identity.user_id !== this.broadcaster ||
         identity.client_id !== process.env.TWITCH_CLIENT_ID
@@ -149,12 +160,9 @@ export class TwitchConnection {
     } catch {
       if (this.stopped) return;
       this.validationFailures++;
-      if (this.validationFailures >= 5) {
-        this.stop();
-        this.status = 'Twitch validation unavailable. Connect again.';
-        return;
-      }
-      this.status = 'Token validation failed — retrying';
+      // Identity service outages must not tear down a working EventSub session.
+      if (!(this.readySocket === this.socket && this.socket?.readyState === WebSocket.OPEN))
+        this.status = 'Token validation failed — retrying';
       clearTimeout(this.validationRetry);
       this.validationRetry = setTimeout(
         () => {
@@ -165,7 +173,7 @@ export class TwitchConnection {
             }
           });
         },
-        Math.min(60000, 5000 * 2 ** (this.validationFailures - 1)),
+        Math.min(60000, 5000 * 2 ** Math.min(4, this.validationFailures - 1)),
       );
     } finally {
       this.validating = false;
@@ -225,6 +233,7 @@ export class TwitchConnection {
               throw new Error('Chat subscription failed. Check Twitch permissions.');
           }
           if (this.stopped || socket !== this.socket) return;
+          this.readySocket = socket;
           this.status = 'Connected';
           if (migrating) old?.close();
         }
@@ -281,6 +290,7 @@ export class TwitchConnection {
   }
   stop() {
     this.stopped = true;
+    this.readySocket = undefined;
     clearTimeout(this.retry);
     clearInterval(this.validation);
     clearTimeout(this.validationRetry);

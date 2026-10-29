@@ -132,3 +132,41 @@ test('Readonly projection never creates jobs or mutates state', () => {
   assert.equal(approvedAnswerPresentation(state, group, 'ru').text, '');
   assert.equal(JSON.stringify(state), before);
 });
+
+test('New question wording detects language cheaply and reuses a cached approved answer', async () => {
+  let resolves = 0,
+    detects = 0,
+    translates = 0;
+  const { worker, group } = setup({
+    resolve: async () => {
+      resolves++;
+      return { language: 'es', text: 'Soy de Argentina.' };
+    },
+    detect: async (question) => {
+      detects++;
+      return question === 'Woher kommst du?' ? 'de' : 'es';
+    },
+    translate: async () => {
+      translates++;
+      return 'Ich komme aus Argentinien.';
+    },
+  });
+  for (const questionText of [
+    '¿De dónde sos?',
+    '¿De qué país eres?',
+    'Woher kommst du?',
+    '¿Dónde naciste?',
+  ]) {
+    const request = { groupId: group.id, language: 'detect' as const, questionText };
+    worker.request(request, 0);
+    await worker.tick(0);
+    assert.equal(worker.request(request).status, 'ready');
+  }
+  assert.equal(resolves, 1);
+  assert.equal(detects, 3);
+  assert.equal(translates, 1);
+  group.answer = 'I moved to Uruguay.';
+  worker.request({ groupId: group.id, language: 'detect', questionText: '¿Dónde vives ahora?' }, 0);
+  await worker.tick(0);
+  assert.equal(resolves, 2, 'Editing the source must invalidate old translations');
+});

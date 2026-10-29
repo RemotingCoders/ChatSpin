@@ -164,7 +164,14 @@ function App() {
           </div>
           <div className="header-actions">
             <LanguagePicker act={act} controller={!!session?.controller && !viewer} />
-            {session?.demo && <span className="badge">{t('DEMO \u00B7 SIMULATED DATA')}</span>}
+            {session?.demo && (
+              <span className="badge" title={t('DEMO \u00B7 SIMULATED DATA')}>
+                <span className="demo-full">{t('DEMO \u00B7 SIMULATED DATA')}</span>
+                <span className="demo-compact" aria-hidden="true">
+                  DEMO
+                </span>
+              </span>
+            )}
             <span className="connection">
               <i className={session?.connection === 'Connected' && !session.demo ? 'online' : ''} />
               {session?.demo ? t('Twitch disconnected') : session?.connection || t('Loading')}

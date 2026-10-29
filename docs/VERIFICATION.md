@@ -1,11 +1,11 @@
 # Verification record
 
-Updated October 29, 2026 with Node.js 24. The latest full deterministic suite passed 139 tests; earlier live checks are recorded separately below.
+Updated October 29, 2026 with Node.js 24. The latest full deterministic suite passed 143 tests; earlier live checks are recorded separately below.
 
 ## Automated verification
 
 - TypeScript validation, production Vite build, extension packaging, compiled-backend import verification and Prettier format check passed.
-- All 139 deterministic tests passed in the latest run. They cover authorization, viewer privacy, origin protection, ordinary questions, minority eligibility, unique supporters, immutable spins, manual choices, participant exclusions, and OBS synchronization.
+- All 143 deterministic tests passed in the latest run. They cover authorization, viewer privacy, origin protection, ordinary questions, minority eligibility, unique supporters, immutable spins, manual choices, participant exclusions, and OBS synchronization.
 - Regression tests cover timing for exact and semantic matches, temporary questions, conflicting answer merges, history preservation, recovered AI jobs, indirect detection, and messages arriving while grouping is pending.
 - Persistence tests cover legacy JSON import, SQLite recovery, encrypted tokens and sessions, persistent OBS token, scope expiry, hard AI budget reservations, retention, paused replies, queue recovery, uncertain sends, process leases, and serialized frontend reloads.
 - Twitch tests use mocked HTTP and local WebSocket servers. They cover deduplication, reconnect/resubscription, revocation, session migration without resubscription, independent socket lifetimes, single-flight credential refresh, and HTTP cancellation.
@@ -32,6 +32,8 @@ See [implementation review](IMPLEMENTATION-REVIEW.md) for the completed priority
 
 ## Latest regression and presentation checks — October 29
 
-The 139-test suite includes no-key approved replies, single-inference reply translation, stale moderator-edit rejection, client validation status codes, invalid overlay signatures without channel creation, forced-language title editing, raw-byte EventSub signatures, scoped subscription deletion and bounded Twitch reconnect/refresh failures. See [rollout checklist](stabilization-verification.md) for remaining live checks.
+The 143-test suite includes no-key approved replies, single-inference reply translation, stale moderator-edit rejection, client validation status codes, invalid overlay signatures without channel creation, forced-language title editing, raw-byte EventSub signatures, scoped subscription deletion and Twitch validation outages, handshake status, refresh backoff/recovery and cached-answer reuse for paraphrased questions. See [rollout checklist](stabilization-verification.md) for remaining live checks.
 
 An isolated demo was checked at 1920×1080, 1280×800 and 390×844. Dashboard text has a 13 px CSS minimum, controls 14 px and question titles 15 px; the checked demo text/background pairs meet a 4.5:1 contrast ratio. This is a targeted presentation check, not a complete WCAG audit. No paid provider calls or real Twitch messages were used for these latest checks.
+
+Mobile header checked at 390 px in English and Spanish: 78.5 px tall, with language, DEMO, sign-out, connection and user visible. Internal cloud exceptions return generic HTTP 500 responses; expected validation errors remain HTTP 400.

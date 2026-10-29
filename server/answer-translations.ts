@@ -226,7 +226,14 @@ export class ApprovedAnswerTranslations {
             (job.language === 'detect'
               ? this.data.answerLanguageCache?.[digest(job.questionText!)]?.language
               : job.language);
-          if (!language && this.provider.resolve) {
+          // Once any language is cached, detect the short question first so a
+          // paraphrase can reuse the approved answer without generating it again.
+          const hasCachedAnswer = answerLanguages.some(
+            (target) =>
+              this.data.approvedAnswerTranslations?.[answerKey(job!.source, target)]?.source ===
+              job!.source,
+          );
+          if (!language && this.provider.resolve && !hasCachedAnswer) {
             const resolved = await this.provider.resolve(
               job.questionText!,
               group.answer,
