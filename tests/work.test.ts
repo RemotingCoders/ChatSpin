@@ -88,3 +88,58 @@ test('Indirect questions are detected and messages arriving during AI all receiv
   await work.tick();
   assert.deepEqual(sent.sort(), ['one', 'two']);
 });
+
+test('A fresh Spanish message reuses a scoped English answer and retains its text for reply translation', async () => {
+  const { retrieveCandidates } = await import('../server/ai.ts');
+  const { cloudDashboardAction } = await import('../server/cloud-actions.ts');
+  const state = emptyState();
+  const target = addQuestion(
+    state,
+    user,
+    'What gear are you using for the stream right now?',
+    'old-message',
+    Date.now() - 1800000,
+  );
+  cloudDashboardAction(state, user, {
+    type: 'answer',
+    id: target.id,
+    text: 'I use a MacBook Pro with OBS',
+    value: 'session',
+  });
+  const delivered: { answer: string; question: string | undefined; message: string }[] = [];
+  const work = new QuestionWork(
+    state,
+    () => {},
+    async (rows) => rows.map((r) => r.id),
+    async (ids) => {
+      const incoming = state.groups.filter((g) => ids.includes(g.id));
+      const candidates = await retrieveCandidates(state, incoming, ids);
+      assert.ok(candidates.includes(target));
+      applyDecisions(
+        state,
+        incoming,
+        candidates,
+        incoming.map((g) => ({
+          source: g.id,
+          target: target.id,
+          confidence: 'equivalent' as const,
+          timeSensitive: true,
+          title: 'Streaming equipment',
+        })),
+      );
+    },
+    (group, _viewer, message, question) =>
+      delivered.push({ answer: group.answer, question, message }),
+  );
+  work.ingest({ id: 'sol', name: 'Sol' }, '¿Qué equipo usás para transmitir?', 'spanish-message');
+  await work.tick();
+  assert.deepEqual(delivered, [
+    {
+      answer: 'I use a MacBook Pro with OBS',
+      question: '¿Qué equipo usás para transmitir?',
+      message: 'spanish-message',
+    },
+  ]);
+  work.deliver();
+  assert.equal(delivered.length, 1);
+});

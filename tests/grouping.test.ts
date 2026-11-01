@@ -220,3 +220,45 @@ test('Retrieval retains time boundaries for changing context, including written 
     assert.deepEqual(await retrieveCandidates(state, [fresh], [fresh.id]), []);
   }
 });
+
+test('Explicitly approved session answers remain multilingual candidates after an old temporal question', async () => {
+  const { cloudDashboardAction } = await import('../server/cloud-actions.ts');
+  const state = emptyState();
+  const owner = { id: 'owner', name: 'Owner' };
+  const target = addQuestion(
+    state,
+    owner,
+    'What gear are you using for the stream right now?',
+    'old',
+    Date.now() - 1800000,
+  );
+  cloudDashboardAction(state, owner, {
+    type: 'answer',
+    id: target.id,
+    text: 'I use a MacBook Pro with OBS',
+    value: 'session',
+  });
+  const source = addQuestion(
+    state,
+    { id: 'viewer', name: 'Viewer' },
+    '¿Qué equipo usás para transmitir?',
+    'new',
+  );
+  const candidates = await retrieveCandidates(state, [source], [source.id]);
+  assert.ok(candidates.includes(target));
+  applyDecisions(state, [source], candidates, [
+    {
+      source: source.id,
+      target: target.id,
+      confidence: 'equivalent',
+      timeSensitive: true,
+      title: 'Streaming equipment',
+    },
+  ]);
+  assert.equal(state.groups.length, 1);
+  assert.equal(target.answer, 'I use a MacBook Pro with OBS');
+  assert.equal(target.questions[1].text, '¿Qué equipo usás para transmitir?');
+  state.liveSession = 'next-session';
+  const next = addQuestion(state, owner, 'What equipment do you stream with?');
+  assert.ok(!(await retrieveCandidates(state, [next], [next.id])).includes(target));
+});

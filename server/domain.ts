@@ -160,7 +160,8 @@ export function addQuestion(
       g.questions.some((q) => normalize(q.text) === normalize(text)) &&
       (g.status === 'pending'
         ? withinWindow(g, now)
-        : answerIsActive(s, g) && (!g.contextual || withinWindow(g, now))),
+        : answerIsActive(s, g) &&
+          (hasExplicitAnswerScope(s, g) || !g.contextual || withinWindow(g, now))),
   );
   if (exact?.questions.some((q) => q.user.id === user.id && normalize(q.text) === normalize(text)))
     return exact;
@@ -193,6 +194,12 @@ export const answerIsActive = (s: State, g: Group) =>
   g.status === 'written' &&
   Boolean(g.answer.trim()) &&
   (g.answerScope === 'permanent' || !g.answerSession || g.answerSession === s.liveSession);
+// Explicit streamer approval defines the lifetime of reusable answers.
+// Legacy answers without a scope retain the conservative temporal guard.
+export const hasExplicitAnswerScope = (s: State, g: Group) =>
+  answerIsActive(s, g) &&
+  (g.answerScope === 'permanent' ||
+    (g.answerScope === 'session' && !!g.answerSession && g.answerSession === s.liveSession));
 export function rememberAnswer(g: Group) {
   if (g.answer.trim()) {
     g.answerHistory ||= [];
