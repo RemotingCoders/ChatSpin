@@ -123,6 +123,7 @@ export class QuestionWork {
       job.attempts = 0;
       job.next = 0;
       job.failed = false;
+      delete job.error;
     }
     for (const m of this.state.pendingMessages!) {
       m.attempts = 0;
@@ -190,8 +191,11 @@ export class QuestionWork {
             error,
             'Grouping failed — retry queued; use Reprocess if exhausted',
           );
+          for (const job of jobs) job.error = this.status;
         }
       }
+      const failed = this.state.aiJobs!.find((job) => job.failed);
+      if (failed) this.status = failed.error || 'Question check failed — review or retry';
       this.deliver();
       this.persist();
     } finally {

@@ -93,6 +93,7 @@ export type State = {
     attempts: number;
     next: number;
     failed?: boolean;
+    error?: string;
   }[];
   pendingMessages?: {
     user: User;
