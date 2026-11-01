@@ -151,3 +151,30 @@ test('A fresh Spanish message reuses a scoped English answer and retains its tex
   work.deliver();
   assert.equal(delivered.length, 1);
 });
+
+test('Idle ticks and worker restarts keep processed questions eligible without new AI calls', async () => {
+  const s = emptyState();
+  const answered = addQuestion(s, user, 'Which computer?');
+  answered.status = 'written';
+  answered.answer = 'MacBook Pro';
+  const open = addQuestion(s, user, 'What is the schedule?');
+  let calls = 0;
+  const makeWorker = () =>
+    new QuestionWork(
+      s,
+      () => {},
+      async () => [],
+      async () => {
+        calls++;
+      },
+      () => {},
+    );
+  await makeWorker().tick();
+  assert.equal(open.aiProcessed, true);
+  for (let i = 0; i < 4; i++) {
+    await makeWorker().tick();
+    assert.equal(open.aiProcessed, true);
+    assert.equal(s.aiJobs!.length, 0);
+  }
+  assert.equal(calls, 1);
+});

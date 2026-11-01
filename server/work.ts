@@ -143,17 +143,10 @@ export class QuestionWork {
       this.state.aiJobs = this.state.aiJobs!.filter((j) =>
         this.state.groups.some((g) => g.id === j.id && g.status === 'pending'),
       );
+      // Only arrivals invalidate processed groups (in register). Background ticks
+      // must not repeatedly requeue them merely because saved answers exist.
       for (const group of this.state.groups)
-        // A repeat can join an already processed open group. Recheck it against
-        // approved answers instead of discarding the new viewer's reply opportunity.
-        if (
-          group.status === 'pending' &&
-          (!group.aiProcessed ||
-            this.state.groups.some((candidate) => answerIsActive(this.state, candidate)))
-        ) {
-          group.aiProcessed = false;
-          this.enqueue(group.id);
-        }
+        if (group.status === 'pending' && !group.aiProcessed) this.enqueue(group.id);
       const messages = this.state
         .pendingMessages!.filter((m) => !m.detected && m.attempts < 3 && m.next <= now)
         .slice(0, 10);
