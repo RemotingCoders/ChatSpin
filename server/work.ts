@@ -94,7 +94,16 @@ export class QuestionWork {
       group.questions.find(
         (q) => q.user.id === message.user.id && normalize(q.text) === normalize(message.text),
       )?.id || group.questions.at(-1)!.id;
-    if (group.status === 'pending' && !group.aiProcessed) this.enqueue(group.id);
+    // A repeat can join an already processed open group. Recheck it against
+    // approved answers instead of discarding the new viewer's reply opportunity.
+    if (
+      group.status === 'pending' &&
+      (!group.aiProcessed ||
+        this.state.groups.some((candidate) => answerIsActive(this.state, candidate)))
+    ) {
+      group.aiProcessed = false;
+      this.enqueue(group.id);
+    }
   }
   deliver(now = Date.now()) {
     this.state.pendingMessages = this.state.pendingMessages!.filter((message) => {
@@ -134,7 +143,16 @@ export class QuestionWork {
         this.state.groups.some((g) => g.id === j.id && g.status === 'pending'),
       );
       for (const group of this.state.groups)
-        if (group.status === 'pending' && !group.aiProcessed) this.enqueue(group.id);
+        // A repeat can join an already processed open group. Recheck it against
+        // approved answers instead of discarding the new viewer's reply opportunity.
+        if (
+          group.status === 'pending' &&
+          (!group.aiProcessed ||
+            this.state.groups.some((candidate) => answerIsActive(this.state, candidate)))
+        ) {
+          group.aiProcessed = false;
+          this.enqueue(group.id);
+        }
       const messages = this.state
         .pendingMessages!.filter((m) => !m.detected && m.attempts < 3 && m.next <= now)
         .slice(0, 10);

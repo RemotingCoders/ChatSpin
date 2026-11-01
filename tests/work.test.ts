@@ -106,6 +106,14 @@ test('A fresh Spanish message reuses a scoped English answer and retains its tex
     text: 'I use a MacBook Pro with OBS',
     value: 'session',
   });
+  const prior = addQuestion(
+    state,
+    { id: 'prior', name: 'Prior' },
+    '¿Qué equipo usás para transmitir?',
+    'prior-message',
+    Date.now() - 60000,
+  );
+  prior.aiProcessed = true;
   const delivered: { answer: string; question: string | undefined; message: string }[] = [];
   const work = new QuestionWork(
     state,
